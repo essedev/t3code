@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fork T3 Code: come arrivano gli aggiornamenti</title>
+    <style>
+      :root {
+        --bg: #f6f5f2;
+        --card: #ffffff;
+        --ink: #1d1d1f;
+        --muted: #6b6b70;
+        --line: #d9d7d2;
+        --up: #3b6fd8;
+        --up-bg: #e8effc;
+        --me: #c2571a;
+        --me-bg: #fbeee5;
+        --ok: #2f8a4c;
+        --ok-bg: #e5f4ea;
+        --ko: #b3261e;
+        --ko-bg: #fbe9e7;
+        --auto: #6b4fbb;
+        --auto-bg: #efeafa;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #161618;
+          --card: #1f1f22;
+          --ink: #ececee;
+          --muted: #9a9aa2;
+          --line: #34343a;
+          --up-bg: #1c2840;
+          --me-bg: #3a2416;
+          --ok-bg: #173022;
+          --ko-bg: #3a1a18;
+          --auto-bg: #282040;
+          --up: #7aa2f0;
+          --me: #ec9a63;
+          --ok: #6cc98b;
+          --ko: #f08a80;
+          --auto: #a993ec;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font:
+          15px/1.5 -apple-system,
+          BlinkMacSystemFont,
+          "Inter",
+          "Segoe UI",
+          sans-serif;
+      }
+      main {
+        padding: 40px 32px 64px;
+      }
+      h1 {
+        font-size: 24px;
+        margin: 0 0 4px;
+        letter-spacing: -0.01em;
+      }
+      h2 {
+        font-size: 16px;
+        margin: 40px 0 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--muted);
+      }
+      p.lead {
+        color: var(--muted);
+        margin: 0 0 8px;
+      }
+      code {
+        font:
+          13px ui-monospace,
+          "SF Mono",
+          Menlo,
+          monospace;
+        background: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        padding: 0 4px;
+      }
+
+      .actors {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+      }
+      .actor {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px;
+      }
+      .actor b {
+        display: block;
+        font-size: 14px;
+      }
+      .actor > span:last-child {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .actor .tag {
+        display: inline-block;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        border-radius: 99px;
+        padding: 1px 8px;
+        margin-bottom: 6px;
+      }
+      .actor.up .tag {
+        background: var(--up-bg);
+        color: var(--up);
+      }
+      .actor.me .tag {
+        background: var(--me-bg);
+        color: var(--me);
+      }
+      .actor.gh .tag {
+        background: var(--ok-bg);
+        color: var(--ok);
+      }
+      .actor.app .tag {
+        background: var(--auto-bg);
+        color: var(--auto);
+      }
+
+      .flow {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 18px;
+      }
+      .flow h3 {
+        margin: 0 0 14px;
+        font-size: 16px;
+      }
+      .steps {
+        display: flex;
+        align-items: stretch;
+        gap: 0;
+      }
+      .step {
+        flex: 1;
+        border-radius: 8px;
+        padding: 12px;
+        font-size: 13.5px;
+        position: relative;
+      }
+      .step .who {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 4px;
+      }
+      .step.up {
+        background: var(--up-bg);
+      }
+      .step.up .who {
+        color: var(--up);
+      }
+      .step.me {
+        background: var(--me-bg);
+      }
+      .step.me .who {
+        color: var(--me);
+      }
+      .step.auto {
+        background: var(--auto-bg);
+      }
+      .step.auto .who {
+        color: var(--auto);
+      }
+      .arrow {
+        flex: 0 0 26px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--muted);
+        font-size: 18px;
+      }
+      .flow .note {
+        margin: 12px 0 0;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .flows {
+        display: grid;
+        gap: 16px;
+      }
+
+      .timeline {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 22px 18px 16px;
+        overflow-x: auto;
+      }
+      .track {
+        display: flex;
+        align-items: flex-start;
+        min-width: 760px;
+        position: relative;
+      }
+      .track::before {
+        content: "";
+        position: absolute;
+        left: 20px;
+        right: 20px;
+        top: 15px;
+        height: 2px;
+        background: var(--line);
+      }
+      .ver {
+        flex: 1;
+        text-align: center;
+        position: relative;
+      }
+      .dot {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        margin: 9px auto 8px;
+        position: relative;
+      }
+      .ver.up .dot {
+        background: var(--up);
+      }
+      .ver.me .dot {
+        background: var(--me);
+      }
+      .ver b {
+        display: block;
+        font:
+          600 14px ui-monospace,
+          "SF Mono",
+          Menlo,
+          monospace;
+      }
+      .ver span {
+        display: block;
+        font-size: 12px;
+        color: var(--muted);
+        padding: 0 4px;
+      }
+      .legend {
+        display: flex;
+        gap: 18px;
+        margin-top: 14px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .legend i {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-right: 6px;
+        vertical-align: -1px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--line);
+        font-size: 14px;
+        vertical-align: top;
+      }
+      th {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--muted);
+        font-weight: 600;
+      }
+      tr:last-child td {
+        border-bottom: 0;
+      }
+      .yes {
+        color: var(--ok);
+        font-weight: 600;
+      }
+      .no {
+        color: var(--ko);
+        font-weight: 600;
+      }
+      .pill {
+        display: inline-block;
+        font-size: 12px;
+        font-weight: 600;
+        border-radius: 99px;
+        padding: 1px 8px;
+      }
+      .pill.manual {
+        background: var(--me-bg);
+        color: var(--me);
+      }
+      .pill.auto {
+        background: var(--auto-bg);
+        color: var(--auto);
+      }
+
+      @media (max-width: 760px) {
+        .actors {
+          grid-template-columns: 1fr 1fr;
+        }
+        .steps {
+          flex-direction: column;
+        }
+        .arrow {
+          flex-basis: 22px;
+          transform: rotate(90deg);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Fork T3 Code: come arrivano gli aggiornamenti</h1>
+      <p class="lead">
+        Chi fa cosa, cosa è manuale e cosa automatico, e che numeri di versione escono.
+      </p>
+
+      <h2>I quattro attori</h2>
+      <div class="actors">
+        <div class="actor up">
+          <span class="tag">pingdotgg</span><b>Upstream</b
+          ><span
+            ><code>pingdotgg/t3code</code>. Theo e soci pubblicano le stable (<code>v0.1.6</code>,
+            <code>v0.1.7</code>…). Non lo tocchi mai.</span
+          >
+        </div>
+        <div class="actor me">
+          <span class="tag">locale</span><b>Il tuo Mac</b
+          ><span
+            >Il checkout sul branch <code>fork</code>, il certificato self-signed e
+            <code>fork/release.sh</code>. Qui si fa la build firmata.</span
+          >
+        </div>
+        <div class="actor gh">
+          <span class="tag">essedev</span><b>Il tuo fork su GitHub</b
+          ><span
+            ><code>essedev/t3code</code>. Le sue Releases sono il "negozio" da cui la tua app
+            scarica gli update.</span
+          >
+        </div>
+        <div class="actor app">
+          <span class="tag">installata</span><b>La tua app</b
+          ><span
+            >T3 Code installata in <code>/Applications</code>. Controlla le Releases del fork, non
+            quelle ufficiali.</span
+          >
+        </div>
+      </div>
+
+      <h2>Caso 1: esce una nuova stable upstream</h2>
+      <div class="flows">
+        <div class="flow">
+          <h3>Vuoi solo stare al passo, senza modifiche nuove tue</h3>
+          <div class="steps">
+            <div class="step up">
+              <div class="who">Upstream</div>
+              Pubblica <code>v0.1.7</code>.
+            </div>
+            <div class="arrow">→</div>
+            <div class="step me">
+              <div class="who">Tu, 2 comandi</div>
+              <code>git fetch upstream --tags</code><br /><code>git rebase v0.1.7</code><br />Le tue
+              modifiche vengono riapplicate sopra la 0.1.7. Conflitti solo se upstream ha cambiato
+              gli stessi file.
+            </div>
+            <div class="arrow">→</div>
+            <div class="step me">
+              <div class="who">Tu, 1 comando</div>
+              <code>fork/release.sh</code><br />Build firmata della <b>0.1.7</b> e pubblicazione su
+              <code>essedev/t3code</code>. Circa 5 minuti.
+            </div>
+            <div class="arrow">→</div>
+            <div class="step auto">
+              <div class="who">Automatico</div>
+              L'app vede la 0.1.7, la scarica e si riavvia aggiornata. Come nel test.
+            </div>
+          </div>
+          <p class="note">
+            Il fork non segue upstream da solo: finché non lanci rebase e release, la tua app resta
+            dov'è. In futuro questo giro si può affidare a una GitHub Action, quando il rebase passa
+            senza conflitti.
+          </p>
+        </div>
+      </div>
+
+      <h2>Caso 2: fai una modifica tua tra due stable</h2>
+      <div class="flows">
+        <div class="flow">
+          <h3>Esempio: aggiungi una funzione mentre upstream è ancora alla 0.1.7</h3>
+          <div class="steps">
+            <div class="step me">
+              <div class="who">Tu</div>
+              Lavori sul branch <code>fork</code> e committi.
+            </div>
+            <div class="arrow">→</div>
+            <div class="step me">
+              <div class="who">Tu, 1 comando</div>
+              <code>fork/release.sh</code><br />Vede che la 0.1.7 del fork è già uscita e rilascia
+              una prerelease della successiva: <b>0.1.8-fork.1</b>.
+            </div>
+            <div class="arrow">→</div>
+            <div class="step auto">
+              <div class="who">Automatico</div>
+              L'app si aggiorna alla 0.1.8-fork.1.
+            </div>
+          </div>
+          <p class="note">
+            Il suffisso serve perché l'updater propone solo versioni più alte di quella installata.
+            Semver ordina 0.1.7 &lt; 0.1.8-fork.1 &lt; 0.1.8-fork.2 &lt; 0.1.8, quindi quando
+            upstream pubblica la 0.1.8 la tua app la riceve comunque.
+          </p>
+        </div>
+      </div>
+
+      <h2>Le versioni nel tempo</h2>
+      <div class="timeline">
+        <div class="track">
+          <div class="ver up">
+            <div class="dot"></div>
+            <b>0.1.6</b><span>parti da qui, uguale a upstream</span>
+          </div>
+          <div class="ver me">
+            <div class="dot"></div>
+            <b>0.1.7-fork.1</b><span>tua modifica</span>
+          </div>
+          <div class="ver me">
+            <div class="dot"></div>
+            <b>0.1.7-fork.2</b><span>altra tua modifica</span>
+          </div>
+          <div class="ver up">
+            <div class="dot"></div>
+            <b>0.1.7</b><span>rebase su upstream: le tue modifiche ci sono ancora</span>
+          </div>
+          <div class="ver me">
+            <div class="dot"></div>
+            <b>0.1.8-fork.1</b><span>tua modifica</span>
+          </div>
+          <div class="ver up">
+            <div class="dot"></div>
+            <b>0.1.8</b><span>rebase su upstream</span>
+          </div>
+        </div>
+        <div class="legend">
+          <span><i style="background: var(--up)"></i>versione uguale a upstream</span
+          ><span><i style="background: var(--me)"></i>versione con suffisso del fork</span>
+        </div>
+      </div>
+
+      <h2>Cosa funziona con ciascun tipo di versione</h2>
+      <table>
+        <tr>
+          <th></th>
+          <th>Uguale a upstream (0.1.7)</th>
+          <th>Con suffisso (0.1.8-fork.1)</th>
+        </tr>
+        <tr>
+          <td>Uso normale dell'app, thread, provider, Connect</td>
+          <td class="yes">Sì</td>
+          <td class="yes">Sì</td>
+        </tr>
+        <tr>
+          <td>Update in-app dal tuo fork</td>
+          <td class="yes">Sì</td>
+          <td class="yes">Sì</td>
+        </tr>
+        <tr>
+          <td>Servizio in background, environment SSH, <code>t3 update</code></td>
+          <td class="yes">Sì</td>
+          <td>
+            <span class="no">No</span>, fino alla stable successiva. Scaricano il runtime CLI da
+            upstream per numero di versione, e la 0.1.8-fork.1 lì non esiste.
+          </td>
+        </tr>
+      </table>
+
+      <h2>Manuale o automatico</h2>
+      <table>
+        <tr>
+          <th>Passo</th>
+          <th>Chi</th>
+          <th>Quando</th>
+        </tr>
+        <tr>
+          <td>Certificato self-signed e trust</td>
+          <td><span class="pill manual">manuale</span></td>
+          <td>Una volta sola, già fatto.</td>
+        </tr>
+        <tr>
+          <td>Creare il fork <code>essedev/t3code</code></td>
+          <td><span class="pill manual">manuale</span></td>
+          <td>Una volta sola, già fatto.</td>
+        </tr>
+        <tr>
+          <td>Prima installazione del fork al posto di Nightly</td>
+          <td><span class="pill manual">manuale</span></td>
+          <td>Una volta sola: trascini il DMG in Applicazioni.</td>
+        </tr>
+        <tr>
+          <td>Rebase su una nuova stable</td>
+          <td><span class="pill manual">manuale</span></td>
+          <td>A ogni stable upstream che vuoi prendere.</td>
+        </tr>
+        <tr>
+          <td><code>fork/release.sh</code></td>
+          <td><span class="pill manual">manuale</span></td>
+          <td>Dopo un rebase o una modifica tua.</td>
+        </tr>
+        <tr>
+          <td>Download, installazione, riavvio dell'app</td>
+          <td><span class="pill auto">automatico</span></td>
+          <td>Sempre, dall'app.</td>
+        </tr>
+      </table>
+    </main>
+  </body>
+</html>
