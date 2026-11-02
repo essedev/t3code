@@ -8,12 +8,16 @@ Fork docs, all in this folder:
 
 - [`DECISIONS.md`](DECISIONS.md): why the fork works this way, numbered and citable as `#N`.
 - [`ROADMAP.md`](ROADMAP.md): what is in progress or next.
+- `changelog/YYYY-MM.md`: every release in order, newest first, one file per month. Written by
+  `release.sh`, never by hand.
 - `features/<name>.md`: one page per fork-only feature, created with the feature.
 - [`release-flow.html`](release-flow.html): visual overview of the release flow.
 
 ## Differences from upstream
 
-Every change to upstream files, so a rebase conflict is easy to place:
+Every upstream file the fork changes, one row each, so a rebase conflict is easy to place. This is
+the current state, not history: a row goes away when the file matches upstream again.
+`release.sh` refuses to release while a changed file has no row or a row has no change.
 
 - `apps/desktop/src/boot.ts`: telemetry and OpenTelemetry export off by default (DECISIONS #5).
 - `CLAUDE.md`: imports this README.
@@ -36,13 +40,17 @@ Every change to upstream files, so a rebase conflict is easy to place:
 ## Releasing
 
 ```sh
+bash fork/release.sh --dry-run   # version, checks and changelog entry, nothing written
 bash fork/release.sh
 ```
 
-It checks the branch, a clean tree, the gh account and the signing identity, picks the version,
-builds a signed DMG and zip with the update feed pointing at `essedev/t3code`, verifies the
-signature and the feed, then pushes `fork` with a `fork-v<version>` tag and publishes the GitHub
-release. The installed app finds it on its next update check.
+It checks the branch, a clean tree, the gh account, the signing identity and the differences
+table, picks the version, and commits the changelog entry: the fork commits whose subjects were
+not in the previous release, plus a line when the upstream base moved. It then builds a signed DMG
+and zip with the update feed pointing at `essedev/t3code`, verifies the signature and the feed,
+pushes `fork` with an annotated `fork-v<version>` tag and publishes the GitHub release with the
+same entry as notes. The installed app finds it on its next update check. Commit subjects become
+the changelog, so write them for a reader.
 
 ## Following a new upstream stable
 
