@@ -48,6 +48,8 @@ echo "Upstream base: $base_tag"
 echo "Fork release:  $version ($tag)"
 
 vp i >/dev/null
+# pnpm records the local @pnpm/exe install in the lockfile even when frozen; it is not a fork change.
+git checkout -- pnpm-lock.yaml
 rm -rf "$out"
 CSC_NAME="$IDENTITY" T3CODE_DESKTOP_UPDATE_REPOSITORY="$REPO_SLUG" \
   vp run dist:desktop:dmg --build-version "$version" --output-dir "$out"
