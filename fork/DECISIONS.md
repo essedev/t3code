@@ -37,3 +37,13 @@ The first release on upstream `vX.Y.Z` is `X.Y.Z`; later ones are `X.Y.(Z+1)-for
 next stable still sorts higher. Tags are `fork-v<version>` because upstream owns `v*`. Rejected:
 `X.Y.Z` scaled to `X.Y.ZNN` (0.1.601 sorts above 0.1.7, so upstream releases would never be
 offered) and upstream versions only (fork changes between upstream releases would not update).
+
+## 5. Telemetry and OpenTelemetry export are off by default
+
+Status: active (2026-11-02)
+
+`apps/desktop/src/boot.ts` defaults `T3CODE_TELEMETRY_ENABLED=false` and
+`T3CODE_OTEL_SDK_DISABLED=true` before the app starts; the backend child inherits them, and every
+consumer (server PostHog analytics, relay tracing, OTLP export) reads these two variables. An
+environment that sets them explicitly still wins. Rejected: removing the telemetry code, which
+spans server, desktop and web and would conflict on every rebase.

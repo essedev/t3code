@@ -11,6 +11,13 @@ Fork docs, all in this folder:
 - `features/<name>.md`: one page per fork-only feature, created with the feature.
 - [`release-flow.html`](release-flow.html): visual overview of the release flow.
 
+## Differences from upstream
+
+Every change to upstream files, so a rebase conflict is easy to place:
+
+- `apps/desktop/src/boot.ts`: telemetry and OpenTelemetry export off by default (DECISIONS #5).
+- `CLAUDE.md`: imports this README.
+
 ## Branches and remotes
 
 - `origin` is `essedev/t3code`, `upstream` is `pingdotgg/t3code`.
