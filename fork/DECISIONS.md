@@ -47,3 +47,28 @@ Status: active (2026-11-02)
 consumer (server PostHog analytics, relay tracing, OTLP export) reads these two variables. An
 environment that sets them explicitly still wins. Rejected: removing the telemetry code, which
 spans server, desktop and web and would conflict on every rebase.
+
+## 6. Fork state that must sync lives in server settings, never in the database
+
+Status: active (2026-11-02)
+
+Fork-only data that has to follow the user across clients (workspace groups first) is a new field
+in the server settings schema, persisted in `settings.json`. The database is shared with the
+official app and its migrations are numbered by upstream, so a fork migration could collide with a
+future upstream one and leave `~/.t3` in a state the official app does not know. Cost: the official
+app drops unknown settings fields when it rewrites `settings.json`. Rejected: event-sourced
+commands and a migration, the native T3 way, for the reasons above.
+
+## 7. Workspace sidebar: projects in the sidebar, threads as tabs, states in a strip
+
+Status: active (2026-11-02)
+
+A fork-only sidebar, switchable against upstream's, lists workspaces (projects) and groups like
+Relay; threads become tabs above the chat. Each tab has its status and today's thread actions; the
+workspace row shows the most urgent tab with `resolveProjectStatusIndicator`'s order (needs you >
+failed > working > finished unread > idle). Pinned tabs sit left in the strip, snoozed and settled
+fold into its `+N`; compact global rows (Needs you, Snoozed, Settled) list tabs across workspaces.
+Built in new files that import upstream's status and action logic. Concept:
+`concepts/concept-a-sidebar-workspace.html`. Rejected: an inbox shelf of tabs on top (A, pushes
+workspaces below the fold) and status sections of workspaces (B, rows move under the cursor and
+groups split).
