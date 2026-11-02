@@ -4,7 +4,12 @@ A personal fork of [pingdotgg/t3code](https://github.com/pingdotgg/t3code) that 
 macOS desktop builds with working in-app updates. Everything fork-specific lives in `fork/`, plus
 one import line in `CLAUDE.md`, so rebasing on a new upstream release rarely conflicts.
 
-Visual overview of the flow: [`release-flow.html`](release-flow.html).
+Fork docs, all in this folder:
+
+- [`DECISIONS.md`](DECISIONS.md): why the fork works this way, numbered and citable as `#N`.
+- [`ROADMAP.md`](ROADMAP.md): what is in progress or next.
+- `features/<name>.md`: one page per fork-only feature, created with the feature.
+- [`release-flow.html`](release-flow.html): visual overview of the release flow.
 
 ## Branches and remotes
 
