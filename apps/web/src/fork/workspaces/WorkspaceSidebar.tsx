@@ -1,4 +1,21 @@
+import { useAtomValue } from "@effect/atom-react";
 import { settlePromise } from "@t3tools/client-runtime/state/runtime";
+import {
+  closestCenter,
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  pointerWithin,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type CollisionDetection,
+  type DragEndEvent,
+  type DragOverEvent,
+} from "@dnd-kit/core";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
+import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import {
   AlarmClockIcon,
   BellDotIcon,
@@ -11,9 +28,10 @@ import {
   SquarePenIcon,
 } from "lucide-react";
 import * as Schema from "effect/Schema";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
-import { openCommandPalette } from "../../commandPaletteBus";
+import { isCommandPaletteOpen, openCommandPalette } from "../../commandPaletteBus";
 import { ProjectFavicon } from "../../components/ProjectFavicon";
 import { SidebarChromeFooter, SidebarChromeHeader } from "../../components/sidebar/SidebarChrome";
 import { Button } from "../../components/ui/button";
@@ -23,13 +41,26 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../../components/ui/toolt
 import { isElectron } from "../../env";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { useLocalStorage } from "../../hooks/useLocalStorage";
-import { useProjectPin } from "../../hooks/useProjectGroupUpdate";
-import { readLocalApi } from "../../localApi";
-import { cn, randomUUID } from "../../lib/utils";
-import { toastManager } from "../../components/ui/toast";
-import { StatusDot, TabList, useRouteWorkspaceRef } from "./WorkspaceParts";
 import {
-  useWorkspaceGroupsEditor,
+  resolveShortcutCommand,
+  shortcutLabelForCommand,
+  shouldShowThreadJumpHintsForModifiers,
+  threadJumpCommandForIndex,
+  threadJumpIndexFromCommand,
+} from "../../keybindings";
+import { useThreadJumpHintsVisible } from "../../components/Sidebar.logic";
+import { useTerminalFocus } from "../../hooks/useTerminalFocus";
+import { useShortcutModifierState } from "../../shortcutModifierState";
+import { readLocalApi } from "../../localApi";
+import { cn, isMacPlatform, randomUUID } from "../../lib/utils";
+import { isTerminalFocused } from "../../lib/terminalFocus";
+import { isModelPickerOpen } from "../../modelPickerVisibility";
+import { primaryServerKeybindingsAtom } from "../../state/server";
+import { toastManager } from "../../components/ui/toast";
+import { ShortcutHint, StatusIcon, statusColorClass, TabList } from "./WorkspaceParts";
+import {
+  useRouteWorkspaceRef,
+  useWorkspaceLayoutEditor,
   useWorkspaceNavigation,
   useWorkspaceSidebarModel,
 } from "./useWorkspaces";
@@ -37,18 +68,50 @@ import {
   addWorkspaceGroup,
   assignWorkspaceToGroup,
   findWorkspaceKey,
+  moveWorkspace,
   moveWorkspaceGroup,
-  moveWorkspaceInGroup,
+  navigableWorkspaces,
   removeWorkspaceGroup,
   renameWorkspaceGroup,
+  stepThrough,
   type Workspace,
+  type WorkspaceContainer,
   type WorkspaceSidebarModel,
   type WorkspaceTab,
 } from "./workspaces.logic";
 
 const COLLAPSED_GROUPS_KEY = "t3code:fork:workspace-groups-collapsed:v1";
+const OTHERS_OPEN_KEY = "t3code:fork:workspace-others-open:v1";
 const NEW_GROUP_NAME = "New group";
+const CONTAINER_PREFIX = "container:";
 const CollapsedGroupIds = Schema.Array(Schema.String);
+const OthersOpen = Schema.Boolean;
+const DRAG_MODIFIERS = [restrictToVerticalAxis];
+
+/** The list a draggable row or a drop zone belongs to, as dnd-kit data. */
+interface DragData {
+  readonly container: WorkspaceContainer;
+}
+
+function containerOf(data: unknown): WorkspaceContainer | null {
+  return typeof data === "object" && data !== null && "container" in data
+    ? (data as DragData).container
+    : null;
+}
+
+// Lists do not nest, so the pointer is inside at most one: drop on its nearest row, or on the list
+// itself when it shows none (a collapsed or empty group).
+const workspaceCollision: CollisionDetection = (args) => {
+  const list = pointerWithin(args).find((hit) => String(hit.id).startsWith(CONTAINER_PREFIX));
+  if (!list) return closestCenter(args);
+  const container = String(list.id).slice(CONTAINER_PREFIX.length);
+  const rows = args.droppableContainers.filter(
+    (droppable) =>
+      !String(droppable.id).startsWith(CONTAINER_PREFIX) &&
+      containerOf(droppable.data.current) === container,
+  );
+  return rows.length === 0 ? [list] : closestCenter({ ...args, droppableContainers: rows });
+};
 
 /** The fork's sidebar: workspaces (projects) in pinned, grouped and ungrouped order. */
 export function WorkspaceSidebar() {
@@ -62,30 +125,109 @@ export function WorkspaceSidebar() {
           route.projectRef,
         );
   const { newThreadIn } = useWorkspaceNavigation();
-  const groupsEditor = useWorkspaceGroupsEditor();
+  const layout = useWorkspaceLayoutEditor();
   const [renamingGroupId, setRenamingGroupId] = useState<string | null>(null);
   const [collapsedGroupIds, setCollapsedGroupIds] = useLocalStorage(
     COLLAPSED_GROUPS_KEY,
     [] as readonly string[],
     CollapsedGroupIds,
   );
+  const [othersOpen, setOthersOpen] = useLocalStorage(OTHERS_OPEN_KEY, false, OthersOpen);
+  const [dragging, setDragging] = useState<{
+    readonly key: string;
+    readonly from: WorkspaceContainer;
+    readonly over: WorkspaceContainer | null;
+  } | null>(null);
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   const createGroup = (projectKey?: string) => {
     const id = randomUUID();
-    groupsEditor.update((groups) => {
+    layout.updateGroups((groups) => {
       const added = addWorkspaceGroup(groups, { id, name: NEW_GROUP_NAME });
       return projectKey === undefined ? added : assignWorkspaceToGroup(added, projectKey, id);
     });
     setRenamingGroupId(id);
   };
 
+  /** Relay's Ctrl+Cmd+G: ungroup the workspace, or start a new group with it. */
+  const toggleGroupOf = (workspace: Workspace) => {
+    const groupId = layout.groups.find((group) => group.projectKeys.includes(workspace.key))?.id;
+    if (groupId === undefined) createGroup(workspace.key);
+    else layout.updateGroups((groups) => assignWorkspaceToGroup(groups, workspace.key, null));
+  };
+
+  useWorkspaceShortcuts({
+    model,
+    collapsedGroupIds,
+    activeWorkspaceKey,
+    activeThreadKey: route.threadKey,
+    onToggleGroup: toggleGroupOf,
+  });
+
+  const keysOf = (container: WorkspaceContainer): string[] => {
+    if (container === "pinned") return model.pinned.map((workspace) => workspace.key);
+    if (container === "ungrouped") return model.ungrouped.map((workspace) => workspace.key);
+    return (
+      model.groups
+        .find((view) => `group:${view.group.id}` === container)
+        ?.workspaces.map((workspace) => workspace.key) ?? []
+    );
+  };
+
+  const dropTarget = (event: DragOverEvent | DragEndEvent) => {
+    const { over } = event;
+    if (!over) return null;
+    const overId = String(over.id);
+    const isList = overId.startsWith(CONTAINER_PREFIX);
+    const to = isList
+      ? (overId.slice(CONTAINER_PREFIX.length) as WorkspaceContainer)
+      : containerOf(over.data.current);
+    return to === null ? null : { to, overKey: isList ? null : overId };
+  };
+
+  const onDragEnd = (event: DragEndEvent) => {
+    setDragging(null);
+    const from = containerOf(event.active.data.current);
+    const target = dropTarget(event);
+    const key = String(event.active.id);
+    const workspace = model.workspaceByKey.get(key);
+    if (from === null || target === null || workspace === undefined) return;
+    if (from === target.to && (target.overKey === null || target.overKey === key)) return;
+    const pinChanges = from !== target.to && (from === "pinned" || target.to === "pinned");
+    if (pinChanges && !layout.canPin(workspace.project)) {
+      toastManager.add({
+        type: "warning",
+        title: target.to === "pinned" ? "Cannot pin this workspace" : "Cannot unpin this workspace",
+        description: "This connection lacks permission to change the project.",
+      });
+      return;
+    }
+    layout.applyMove(
+      workspace.project,
+      moveWorkspace({
+        groups: layout.groups,
+        workspaceOrder: layout.workspaceOrder,
+        key,
+        from,
+        to: target.to,
+        targetKeys: keysOf(target.to),
+        overKey: target.overKey,
+      }),
+    );
+  };
+
   const activeWorkspace =
     activeWorkspaceKey === null ? null : (model.workspaceByKey.get(activeWorkspaceKey) ?? null);
+  const jumpHints = useWorkspaceJumpHints(navigableWorkspaces(model, collapsedGroupIds));
   const rowProps = {
+    jumpHints,
     activeWorkspaceKey,
-    groups: groupsEditor.groups,
+    groups: layout.groups,
     onCreateGroup: createGroup,
   };
+  const dropHighlight = (container: WorkspaceContainer) =>
+    dragging !== null && dragging.over === container && dragging.from !== container;
+  const listedCount = model.pinned.length + model.ungrouped.length + model.groups.length;
 
   return (
     <>
@@ -127,110 +269,329 @@ export function WorkspaceSidebar() {
         }
       >
         <SidebarGroup className="flex-1" role="presentation">
-          <div className="flex flex-col gap-3">
-            {model.workspaces.length === 0 ? (
-              <p className="px-2 py-6 text-center text-sm text-sidebar-muted-foreground">
-                No projects yet. Add one to start.
-              </p>
-            ) : null}
-            {model.pinned.length > 0 ? (
-              <ul className="flex flex-col gap-0.5" aria-label="Pinned workspaces">
-                {model.pinned.map((workspace) => (
-                  <WorkspaceRow key={workspace.key} workspace={workspace} pinned {...rowProps} />
-                ))}
-              </ul>
-            ) : null}
-            {model.groups.map((view, index) => {
-              const collapsed = collapsedGroupIds.includes(view.group.id);
-              return (
-                <GroupCard
-                  key={view.group.id}
-                  name={view.group.name}
-                  count={view.workspaces.length}
-                  collapsed={collapsed}
-                  status={collapsed ? view.status : null}
-                  renaming={renamingGroupId === view.group.id}
-                  onToggle={() =>
-                    setCollapsedGroupIds((ids) =>
-                      collapsed
-                        ? ids.filter((id) => id !== view.group.id)
-                        : [...ids, view.group.id],
-                    )
-                  }
-                  onRename={(name) => {
-                    setRenamingGroupId(null);
-                    groupsEditor.update((groups) =>
-                      renameWorkspaceGroup(groups, view.group.id, name),
-                    );
-                  }}
-                  onMenu={(position) =>
-                    void openGroupMenu(position, {
-                      canMoveUp: index > 0,
-                      canMoveDown: index < model.groups.length - 1,
-                    }).then((action) => {
-                      if (action === "rename") setRenamingGroupId(view.group.id);
-                      if (action === "move-up" || action === "move-down") {
-                        groupsEditor.update((groups) =>
-                          moveWorkspaceGroup(groups, view.group.id, action === "move-up" ? -1 : 1),
-                        );
-                      }
-                      if (action === "delete") {
-                        groupsEditor.update((groups) =>
-                          removeWorkspaceGroup(groups, view.group.id),
-                        );
-                      }
-                    })
-                  }
-                >
-                  {view.workspaces.length === 0 ? (
-                    <p className="px-2 py-1 text-xs text-sidebar-muted-foreground">
-                      Empty. Right-click a workspace to move it here.
-                    </p>
-                  ) : (
-                    view.workspaces.map((workspace, position) => (
-                      <WorkspaceRow
-                        key={workspace.key}
-                        workspace={workspace}
-                        groupId={view.group.id}
-                        canMoveUp={position > 0}
-                        canMoveDown={position < view.workspaces.length - 1}
-                        {...rowProps}
-                      />
-                    ))
-                  )}
-                </GroupCard>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={workspaceCollision}
+            modifiers={DRAG_MODIFIERS}
+            onDragStart={(event) => {
+              const from = containerOf(event.active.data.current);
+              if (from !== null) setDragging({ key: String(event.active.id), from, over: from });
+            }}
+            onDragOver={(event) => {
+              const target = dropTarget(event);
+              setDragging((current) =>
+                current === null ? null : { ...current, over: target?.to ?? null },
               );
-            })}
-            {model.ungrouped.length > 0 ? (
-              <div className="flex flex-col gap-0.5">
-                {model.groups.length > 0 || model.pinned.length > 0 ? (
-                  <h3 className="px-2 pt-1 text-xs font-medium text-sidebar-muted-foreground">
-                    Workspaces
-                  </h3>
-                ) : null}
-                <ul className="flex flex-col gap-0.5">
-                  {model.ungrouped.map((workspace) => (
-                    <WorkspaceRow key={workspace.key} workspace={workspace} {...rowProps} />
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-            {model.workspaces.length > 0 ? (
-              <button
-                type="button"
-                onClick={() => createGroup()}
-                className="flex h-7 cursor-pointer items-center gap-2 rounded-md px-2 text-xs text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:outline-none"
-              >
-                <PlusIcon className="size-3.5" />
-                New group
-              </button>
-            ) : null}
-          </div>
+            }}
+            onDragEnd={onDragEnd}
+            onDragCancel={() => setDragging(null)}
+          >
+            <div className="flex flex-col gap-3">
+              {model.workspaces.length === 0 ? (
+                <p className="px-2 py-6 text-center text-sm text-sidebar-muted-foreground">
+                  No projects yet. Add one to start.
+                </p>
+              ) : listedCount === 0 ? (
+                <p className="px-2 py-6 text-center text-sm text-sidebar-muted-foreground">
+                  No open threads. Start one, or open a project below.
+                </p>
+              ) : null}
+              {model.pinned.length > 0 || dragging !== null ? (
+                <WorkspaceList
+                  container="pinned"
+                  label="Pinned workspaces"
+                  highlight={dropHighlight("pinned")}
+                  workspaces={model.pinned}
+                  emptyLabel="Drop here to pin."
+                  rowProps={rowProps}
+                />
+              ) : null}
+              {model.groups.map((view, index) => {
+                const container = `group:${view.group.id}` as const;
+                const collapsed = collapsedGroupIds.includes(view.group.id);
+                return (
+                  <GroupCard
+                    key={view.group.id}
+                    container={container}
+                    highlight={dropHighlight(container)}
+                    name={view.group.name}
+                    count={view.workspaces.length}
+                    collapsed={collapsed}
+                    status={collapsed ? view.status : null}
+                    renaming={renamingGroupId === view.group.id}
+                    onToggle={() =>
+                      setCollapsedGroupIds((ids) =>
+                        collapsed
+                          ? ids.filter((id) => id !== view.group.id)
+                          : [...ids, view.group.id],
+                      )
+                    }
+                    onRename={(name) => {
+                      setRenamingGroupId(null);
+                      layout.updateGroups((groups) =>
+                        renameWorkspaceGroup(groups, view.group.id, name),
+                      );
+                    }}
+                    onMenu={(position) =>
+                      void openGroupMenu(position, {
+                        canMoveUp: index > 0,
+                        canMoveDown: index < model.groups.length - 1,
+                      }).then((action) => {
+                        if (action === "rename") setRenamingGroupId(view.group.id);
+                        if (action === "move-up" || action === "move-down") {
+                          layout.updateGroups((groups) =>
+                            moveWorkspaceGroup(
+                              groups,
+                              view.group.id,
+                              action === "move-up" ? -1 : 1,
+                            ),
+                          );
+                        }
+                        if (action === "delete") {
+                          layout.updateGroups((groups) =>
+                            removeWorkspaceGroup(groups, view.group.id),
+                          );
+                        }
+                      })
+                    }
+                  >
+                    <SortableContext
+                      items={view.workspaces.map((workspace) => workspace.key)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      {view.workspaces.length === 0 ? (
+                        <p className="px-2 py-1 text-xs text-sidebar-muted-foreground">
+                          Empty. Drag a workspace here.
+                        </p>
+                      ) : (
+                        view.workspaces.map((workspace) => (
+                          <WorkspaceRow
+                            key={workspace.key}
+                            workspace={workspace}
+                            container={container}
+                            {...rowProps}
+                          />
+                        ))
+                      )}
+                    </SortableContext>
+                  </GroupCard>
+                );
+              })}
+              {model.ungrouped.length > 0 || dragging !== null ? (
+                <div className="flex flex-col gap-0.5">
+                  {model.groups.length > 0 || model.pinned.length > 0 ? (
+                    <h3 className="px-2 pt-1 text-xs font-medium text-sidebar-muted-foreground">
+                      Workspaces
+                    </h3>
+                  ) : null}
+                  <WorkspaceList
+                    container="ungrouped"
+                    label="Workspaces"
+                    highlight={dropHighlight("ungrouped")}
+                    workspaces={model.ungrouped}
+                    emptyLabel="Drop here to take it out of its group."
+                    rowProps={rowProps}
+                  />
+                </div>
+              ) : null}
+              {model.workspaces.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => createGroup()}
+                  className="flex h-7 cursor-pointer items-center gap-2 rounded-md px-2 text-xs text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:outline-none"
+                >
+                  <PlusIcon className="size-3.5" />
+                  New group
+                </button>
+              ) : null}
+              {model.others.length > 0 ? (
+                <div className="flex flex-col gap-0.5">
+                  <button
+                    type="button"
+                    aria-expanded={othersOpen}
+                    onClick={() => setOthersOpen(!othersOpen)}
+                    className="flex h-7 cursor-pointer items-center gap-2 rounded-md px-2 text-left text-xs font-medium text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:outline-none"
+                  >
+                    <ChevronDownIcon
+                      aria-hidden
+                      className={cn(
+                        "size-3 shrink-0 transition-transform",
+                        !othersOpen && "-rotate-90",
+                      )}
+                    />
+                    <span className="min-w-0 flex-1 truncate">Other projects</span>
+                    <span className="shrink-0 tabular-nums">{model.others.length}</span>
+                  </button>
+                  {othersOpen ? (
+                    <ul className="flex flex-col gap-0.5" aria-label="Other projects">
+                      {model.others.map((workspace) => (
+                        <WorkspaceRow
+                          key={workspace.key}
+                          workspace={workspace}
+                          container={null}
+                          {...rowProps}
+                        />
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+            {/* In a portal so the sidebar's fixed header and scroll clipping cannot cover it. */}
+            {createPortal(
+              <DragOverlay dropAnimation={null} zIndex={60}>
+                {dragging === null ? null : (
+                  <WorkspaceDragPreview
+                    workspace={model.workspaceByKey.get(dragging.key) ?? null}
+                  />
+                )}
+              </DragOverlay>,
+              document.body,
+            )}
+          </DndContext>
         </SidebarGroup>
       </SidebarContent>
       <GlobalRows model={model} />
       <SidebarChromeFooter />
     </>
+  );
+}
+
+/**
+ * Relay's workspace shortcuts: `Cmd+1..9` (upstream's jump-to-thread binding) picks a visible
+ * workspace, `Option+Cmd+Up/Down` steps through them, `Option+Cmd+J` (`+Shift` backwards) goes to
+ * the next thread that needs you, `Ctrl+Cmd+G` groups or ungroups the current workspace. Relay's
+ * `Cmd+J` stays upstream's terminal toggle.
+ */
+function useWorkspaceShortcuts(input: {
+  readonly model: WorkspaceSidebarModel;
+  readonly collapsedGroupIds: readonly string[];
+  readonly activeWorkspaceKey: string | null;
+  readonly activeThreadKey: string | null;
+  readonly onToggleGroup: (workspace: Workspace) => void;
+}) {
+  const { model, collapsedGroupIds, activeWorkspaceKey, activeThreadKey, onToggleGroup } = input;
+  const { openWorkspace, openThread } = useWorkspaceNavigation();
+  const keybindings = useAtomValue(primaryServerKeybindingsAtom);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes to window keydown for the workspace shortcuts with the current sidebar order
+  useEffect(() => {
+    const isMac = isMacPlatform(navigator.platform);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.repeat || isCommandPaletteOpen() || isModelPickerOpen()) {
+        return;
+      }
+      const mod = isMac ? event.metaKey : event.ctrlKey;
+      const handled = () => {
+        event.preventDefault();
+        event.stopPropagation();
+      };
+      const workspaces = navigableWorkspaces(model, collapsedGroupIds);
+      const current =
+        activeWorkspaceKey === null ? null : model.workspaceByKey.get(activeWorkspaceKey);
+      if (mod && event.altKey && (event.code === "ArrowUp" || event.code === "ArrowDown")) {
+        const next = stepThrough(workspaces, activeWorkspaceKey, event.code === "ArrowUp" ? -1 : 1);
+        if (next) {
+          handled();
+          openWorkspace(next);
+        }
+        return;
+      }
+      if (mod && event.altKey && event.code === "KeyJ") {
+        const next = stepThrough<WorkspaceTab>(
+          model.needsYou,
+          activeThreadKey,
+          event.shiftKey ? -1 : 1,
+        );
+        if (next) {
+          handled();
+          openThread(next.thread);
+        }
+        return;
+      }
+      if (
+        event.code === "KeyG" &&
+        event.ctrlKey &&
+        (isMac ? event.metaKey : event.altKey) &&
+        !event.shiftKey
+      ) {
+        if (current) {
+          handled();
+          onToggleGroup(current);
+        }
+        return;
+      }
+      const command = resolveShortcutCommand(event, keybindings, {
+        platform: navigator.platform,
+        context: {
+          terminalFocus: isTerminalFocused(),
+          modelPickerOpen: isModelPickerOpen(),
+          isWeb: !isElectron,
+          isDesktop: isElectron,
+        },
+      });
+      const jumpIndex = threadJumpIndexFromCommand(command ?? "");
+      const target = jumpIndex === null ? undefined : workspaces[jumpIndex];
+      if (target) {
+        handled();
+        openWorkspace(target);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [
+    model,
+    collapsedGroupIds,
+    activeWorkspaceKey,
+    activeThreadKey,
+    onToggleGroup,
+    openWorkspace,
+    openThread,
+    keybindings,
+  ]);
+}
+
+/**
+ * The `Cmd+1..9` label of each visible workspace while the jump modifier is held, empty
+ * otherwise; upstream's sidebar does the same for its threads.
+ */
+function useWorkspaceJumpHints(workspaces: readonly Workspace[]): ReadonlyMap<string, string> {
+  const keybindings = useAtomValue(primaryServerKeybindingsAtom);
+  const modifiers = useShortcutModifierState();
+  const terminalFocus = useTerminalFocus();
+  const visible = useThreadJumpHintsVisible(
+    shouldShowThreadJumpHintsForModifiers(modifiers, keybindings, {
+      platform: navigator.platform,
+      context: {
+        terminalFocus,
+        modelPickerOpen: isModelPickerOpen(),
+        isWeb: !isElectron,
+        isDesktop: isElectron,
+      },
+    }),
+  );
+  const hints = new Map<string, string>();
+  if (!visible) return hints;
+  for (const [index, workspace] of workspaces.entries()) {
+    const label = shortcutLabelForCommand(keybindings, threadJumpCommandForIndex(index), {
+      platform: navigator.platform,
+      context: { isWeb: !isElectron, isDesktop: isElectron },
+    });
+    if (label === null) break;
+    hints.set(workspace.key, label);
+  }
+  return hints;
+}
+
+/** The row that follows the pointer while a workspace is dragged, across lists too. */
+function WorkspaceDragPreview(props: { readonly workspace: Workspace | null }) {
+  if (props.workspace === null) return null;
+  const { project } = props.workspace;
+  return (
+    <div className="flex cursor-grabbing items-center gap-2.5 rounded-md bg-sidebar-row-active px-2 py-1.5 text-sm font-medium text-sidebar-foreground shadow-md ring-1 ring-sidebar-border">
+      <ProjectFavicon project={project} className="size-4" />
+      <span className="min-w-0 flex-1 truncate">{project.displayName}</span>
+      <StatusIcon status={props.workspace.status} />
+    </div>
   );
 }
 
@@ -258,7 +619,54 @@ function HeaderIconButton(props: {
   );
 }
 
+/** A sortable list of workspace rows that is also a drop zone, with a hint while empty. */
+function WorkspaceList(props: {
+  readonly container: "pinned" | "ungrouped";
+  readonly label: string;
+  readonly highlight: boolean;
+  readonly workspaces: readonly Workspace[];
+  readonly emptyLabel: string;
+  readonly rowProps: Omit<WorkspaceRowProps, "workspace" | "container">;
+}) {
+  const { setNodeRef } = useDroppable({
+    id: `${CONTAINER_PREFIX}${props.container}`,
+    data: { container: props.container } satisfies DragData,
+  });
+  return (
+    <ul
+      ref={setNodeRef}
+      aria-label={props.label}
+      className={cn(
+        "flex min-h-7 flex-col gap-0.5 rounded-md",
+        props.highlight && "ring-1 ring-ring ring-inset",
+      )}
+    >
+      <SortableContext
+        items={props.workspaces.map((workspace) => workspace.key)}
+        strategy={verticalListSortingStrategy}
+      >
+        {props.workspaces.length === 0 ? (
+          <li className="list-none px-2 py-1.5 text-xs text-sidebar-muted-foreground">
+            {props.emptyLabel}
+          </li>
+        ) : (
+          props.workspaces.map((workspace) => (
+            <WorkspaceRow
+              key={workspace.key}
+              workspace={workspace}
+              container={props.container}
+              {...props.rowProps}
+            />
+          ))
+        )}
+      </SortableContext>
+    </ul>
+  );
+}
+
 function GroupCard(props: {
+  readonly container: WorkspaceContainer;
+  readonly highlight: boolean;
   readonly name: string;
   readonly count: number;
   readonly collapsed: boolean;
@@ -269,8 +677,18 @@ function GroupCard(props: {
   readonly onMenu: (position: { x: number; y: number }) => void;
   readonly children: ReactNode;
 }) {
+  const { setNodeRef } = useDroppable({
+    id: `${CONTAINER_PREFIX}${props.container}`,
+    data: { container: props.container } satisfies DragData,
+  });
   return (
-    <section className="rounded-lg border border-sidebar-border/70 p-1">
+    <section
+      ref={setNodeRef}
+      className={cn(
+        "rounded-lg border p-1",
+        props.highlight ? "border-ring" : "border-sidebar-border/70",
+      )}
+    >
       <div className="flex items-center gap-1">
         {props.renaming ? (
           <input
@@ -304,7 +722,7 @@ function GroupCard(props: {
               )}
             />
             <span className="min-w-0 flex-1 truncate">{props.name}</span>
-            <StatusDot status={props.status} />
+            <StatusIcon status={props.status} />
             <span className="shrink-0 tabular-nums">{props.count}</span>
           </button>
         )}
@@ -314,37 +732,45 @@ function GroupCard(props: {
   );
 }
 
-function WorkspaceRow(props: {
+interface WorkspaceRowProps {
   readonly workspace: Workspace;
+  /** The list the row is dragged within; null for rows that do not drag (Other projects). */
+  readonly container: WorkspaceContainer | null;
+  /** `Cmd+N` labels shown while the modifier is held, by workspace key. */
+  readonly jumpHints: ReadonlyMap<string, string>;
   readonly activeWorkspaceKey: string | null;
-  readonly groups: ReturnType<typeof useWorkspaceGroupsEditor>["groups"];
+  readonly groups: ReturnType<typeof useWorkspaceLayoutEditor>["groups"];
   readonly onCreateGroup: (projectKey: string) => void;
-  readonly pinned?: boolean;
-  readonly groupId?: string;
-  readonly canMoveUp?: boolean;
-  readonly canMoveDown?: boolean;
-}) {
+}
+
+function WorkspaceRow(props: WorkspaceRowProps) {
   const { workspace } = props;
   const { project } = workspace;
   const { openWorkspace, newThreadIn, openProjectSettings } = useWorkspaceNavigation();
-  const groupsEditor = useWorkspaceGroupsEditor();
-  const { canPinProjectGroup, setProjectGroupPinned } = useProjectPin();
+  const layout = useWorkspaceLayoutEditor();
   const { copyToClipboard } = useCopyToClipboard<{ path: string }>({
     onCopy: ({ path }) =>
       toastManager.add({ type: "success", title: "Path copied", description: path }),
   });
+  const { listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: workspace.key,
+    data: props.container === null ? {} : ({ container: props.container } satisfies DragData),
+    disabled: props.container === null,
+  });
   const active = props.activeWorkspaceKey === workspace.key;
   const openCount = workspace.openTabs.length;
+  const jumpHint = props.jumpHints.get(workspace.key) ?? null;
+  const currentGroupId =
+    props.groups.find((group) => group.projectKeys.includes(workspace.key))?.id ?? null;
 
   const openMenu = async (position: { x: number; y: number }) => {
     const api = readLocalApi();
     if (!api) return;
-    const currentGroupId = props.groupId ?? null;
     const clicked = await settlePromise(() =>
       api.contextMenu.show(
         [
           { id: "new-thread", label: "New thread" },
-          ...(canPinProjectGroup(project)
+          ...(layout.canPin(project)
             ? [
                 project.pinned
                   ? { id: "unpin", label: "Unpin workspace", icon: "pin-off" }
@@ -364,13 +790,7 @@ function WorkspaceRow(props: {
               { id: "group:new", label: "New group…", separatorBefore: props.groups.length > 0 },
             ],
           },
-          ...(currentGroupId !== null
-            ? [
-                ...(props.canMoveUp ? [{ id: "move-up", label: "Move up" }] : []),
-                ...(props.canMoveDown ? [{ id: "move-down", label: "Move down" }] : []),
-                { id: "ungroup", label: "Remove from group" },
-              ]
-            : []),
+          ...(currentGroupId !== null ? [{ id: "ungroup", label: "Remove from group" }] : []),
           { id: "copy-path", label: "Copy path", separatorBefore: true },
           { id: "project-settings", label: "Project settings", icon: "settings" },
         ],
@@ -385,7 +805,7 @@ function WorkspaceRow(props: {
     }
     if (action.startsWith("group:")) {
       const groupId = action.slice("group:".length);
-      groupsEditor.update((groups) => assignWorkspaceToGroup(groups, workspace.key, groupId));
+      layout.updateGroups((groups) => assignWorkspaceToGroup(groups, workspace.key, groupId));
       return;
     }
     switch (action) {
@@ -394,16 +814,17 @@ function WorkspaceRow(props: {
         return;
       case "pin":
       case "unpin":
-        setProjectGroupPinned(project, action === "pin");
-        return;
-      case "move-up":
-      case "move-down":
-        groupsEditor.update((groups) =>
-          moveWorkspaceInGroup(groups, workspace.key, action === "move-up" ? -1 : 1),
-        );
+        layout.applyMove(project, {
+          groups:
+            action === "pin"
+              ? assignWorkspaceToGroup(props.groups, workspace.key, null)
+              : [...props.groups],
+          workspaceOrder: [...layout.workspaceOrder],
+          pinned: action === "pin",
+        });
         return;
       case "ungroup":
-        groupsEditor.update((groups) => assignWorkspaceToGroup(groups, workspace.key, null));
+        layout.updateGroups((groups) => assignWorkspaceToGroup(groups, workspace.key, null));
         return;
       case "copy-path":
         copyToClipboard(project.workspaceRoot, { path: project.workspaceRoot });
@@ -415,9 +836,14 @@ function WorkspaceRow(props: {
   };
 
   return (
-    <li className="group/workspace relative list-none">
+    <li
+      ref={setNodeRef}
+      style={{ transform: CSS.Translate.toString(transform), transition }}
+      className={cn("group/workspace relative list-none", isDragging && "opacity-40")}
+    >
       <button
         type="button"
+        {...listeners}
         aria-current={active ? "page" : undefined}
         onClick={() => openWorkspace(workspace)}
         onContextMenu={(event) => {
@@ -433,7 +859,7 @@ function WorkspaceRow(props: {
       >
         <span className="relative mt-0.5 flex size-4 shrink-0 items-center justify-center">
           <ProjectFavicon project={project} className="size-4" />
-          {props.pinned ? (
+          {project.pinned ? (
             <PinIcon
               aria-label="Pinned"
               className="absolute -right-1.5 -bottom-1 size-2.5 text-sidebar-muted-foreground"
@@ -445,8 +871,8 @@ function WorkspaceRow(props: {
             <span className="min-w-0 flex-1 truncate text-sm font-medium">
               {project.displayName}
             </span>
-            <StatusDot status={workspace.status} />
-            {openCount > 0 ? (
+            <StatusIcon status={workspace.status} />
+            {openCount > 0 && jumpHint === null ? (
               <span className="shrink-0 text-xs tabular-nums text-sidebar-muted-foreground group-hover/workspace:invisible pointer-coarse:invisible">
                 {openCount}
               </span>
@@ -456,13 +882,16 @@ function WorkspaceRow(props: {
             <span
               className={cn(
                 "block truncate text-xs",
-                workspace.status ? workspace.status.colorClass : "text-sidebar-muted-foreground",
+                workspace.status
+                  ? statusColorClass(workspace.status)
+                  : "text-sidebar-muted-foreground",
               )}
             >
               {workspace.leadTab.thread.title}
             </span>
           ) : null}
         </span>
+        {jumpHint ? <ShortcutHint label={jumpHint} /> : null}
       </button>
       <span className="absolute top-1 right-1 flex items-center opacity-0 focus-within:opacity-100 group-hover/workspace:opacity-100 pointer-coarse:opacity-100">
         <Tooltip>
