@@ -15,9 +15,9 @@ unchanged. Design and rejected variants: DECISIONS #7 and
   or live), is pinned, or is the one on screen. Settling or snoozing its last tab takes it off the
   list; a new thread there, or a snooze that wakes, brings it back. The rest are one `Cmd+N` (pick
   a project) or Go to project away.
-- **Groups**: named cards that collect workspaces, like Relay. Create one from a workspace's right-click
-  menu (Move to group > New group) or with `Ctrl+Cmd+G`. Rename,
-  reorder and delete from the group's right-click menu. A group shows only its listed members and
+- **Groups**: named cards that collect workspaces, like Relay. Create one from a workspace's
+  right-click menu (Move to group > New group) or with `Ctrl+Cmd+G`. Rename, reorder and delete
+  from the group's right-click menu. A group shows only its listed members and
   hides while none is, except a new empty group, which stays so a workspace can be dragged in.
   Groups sync through server settings (`fork.workspaceGroups`); open or closed is per device. A
   closed group shows the most urgent status among its workspaces.
@@ -29,13 +29,15 @@ unchanged. Design and rejected variants: DECISIONS #7 and
   goes to the end.
 - **Global rows** at the bottom: Needs you (approvals, questions, guest requests, plans, failures
   and results not seen yet), Snoozed (with wake time and Wake) and Settled (newest 10, Show all,
-  Un-settle), across every workspace. A row opens its thread.
+  Un-settle), across every workspace. A row opens its thread. Settled holds only the settled
+  threads the server sends at start, the 25 most recent (see Limits).
 - **Tab strip** under the chat header: the workspace's open threads, pinned first, then the rest
-  in the dragged order, else creation order. Each tab has its status icon; hover shows Snooze and Settle; right click
-  opens upstream's full thread menu; double click renames; middle click settles. Settling or snoozing the tab
-  on screen, from any of these or the menu, opens the tab to its right (else its left, else a new
-  thread), once the server confirms; an auto-settle never moves you. A snoozed or
-  settled thread opened from a list shows as an extra tab. The `+N` button lists the
+  in the dragged order, else creation order. Each tab has its status icon; hover shows Snooze and
+  Settle; right click opens upstream's full thread menu; double click renames; middle click
+  settles. Settling or snoozing the tab on screen, from any control, the menu or `Cmd+Shift+S`,
+  opens the tab to its right (else its left, else a new thread) once the server confirms; an
+  auto-settle never moves you. A snoozed or settled thread opened from a list shows as an extra
+  tab until you leave it. The `+N` button lists the
   workspace's snoozed and settled threads; the pen starts a new thread in the workspace.
 - **Status icons**: upstream's sidebar icons and colours (Working, Waiting, Approval, Input,
   Request, Failed, Woke, Done), plus Plan ready, which upstream's sidebar does not draw.
@@ -53,7 +55,8 @@ unchanged. Design and rejected variants: DECISIONS #7 and
 
   Holding `Cmd` or `Option` for a moment shows the numbers on the rows and tabs, like upstream's
   jump hints. Relay's `Cmd+J`, `Cmd+W`, `Cmd+D` and `Cmd+P` stay upstream's (terminal, right
-  panel, diff, file picker); `Cmd+Shift+S` settles. Settle-and-advance settles the tab and opens the next one.
+  panel, diff, file picker); `Cmd+Shift+S` settles and moves on, `Cmd+N` starts a thread in a
+  project picked from the palette.
 
 ## How it is built
 
@@ -80,8 +83,10 @@ README's differences table.
 
 ## Limits
 
-- Settled lists only the settled threads the client has loaded; upstream pages older ones in on
-  demand in its own sidebar.
+- Settled lists only the settled threads the client holds: the server's shell stream keeps the 25
+  most recently settled (`NEWEST_SETTLED_KEPT` in `apps/server/src/orchestration-v2/ShellStream.ts`),
+  and the count shows the same. Upstream's sidebar pages older ones in as its shelf scrolls; the
+  fork does not yet, and `Cmd+K` still finds them.
 - Upstream's sidebar search is not there; the Go to project or thread field opens the command
   palette (Cmd+K), which searches projects and threads.
 - Mobile keeps its own thread-centred navigation.
