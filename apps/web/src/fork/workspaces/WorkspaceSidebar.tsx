@@ -23,7 +23,6 @@ import {
   ChevronDownIcon,
   FolderPlusIcon,
   PinIcon,
-  PlusIcon,
   SearchIcon,
   SquarePenIcon,
 } from "lucide-react";
@@ -81,11 +80,9 @@ import {
 } from "./workspaces.logic";
 
 const COLLAPSED_GROUPS_KEY = "t3code:fork:workspace-groups-collapsed:v1";
-const OTHERS_OPEN_KEY = "t3code:fork:workspace-others-open:v1";
 const NEW_GROUP_NAME = "New group";
 const CONTAINER_PREFIX = "container:";
 const CollapsedGroupIds = Schema.Array(Schema.String);
-const OthersOpen = Schema.Boolean;
 const DRAG_MODIFIERS = [restrictToVerticalAxis];
 
 /** The list a draggable row or a drop zone belongs to, as dnd-kit data. */
@@ -132,7 +129,6 @@ export function WorkspaceSidebar() {
     [] as readonly string[],
     CollapsedGroupIds,
   );
-  const [othersOpen, setOthersOpen] = useLocalStorage(OTHERS_OPEN_KEY, false, OthersOpen);
   const [dragging, setDragging] = useState<{
     readonly key: string;
     readonly from: WorkspaceContainer;
@@ -293,7 +289,8 @@ export function WorkspaceSidebar() {
                 </p>
               ) : listedCount === 0 ? (
                 <p className="px-2 py-6 text-center text-sm text-sidebar-muted-foreground">
-                  No open threads. Start one, or open a project below.
+                  No open threads. Start one with the pen above, or pick any project with Go to
+                  project.
                 </p>
               ) : null}
               {model.pinned.length > 0 || dragging !== null ? (
@@ -392,48 +389,6 @@ export function WorkspaceSidebar() {
                     emptyLabel="Drop here to take it out of its group."
                     rowProps={rowProps}
                   />
-                </div>
-              ) : null}
-              {model.workspaces.length > 0 ? (
-                <button
-                  type="button"
-                  onClick={() => createGroup()}
-                  className="flex h-7 cursor-pointer items-center gap-2 rounded-md px-2 text-xs text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:outline-none"
-                >
-                  <PlusIcon className="size-3.5" />
-                  New group
-                </button>
-              ) : null}
-              {model.others.length > 0 ? (
-                <div className="flex flex-col gap-0.5">
-                  <button
-                    type="button"
-                    aria-expanded={othersOpen}
-                    onClick={() => setOthersOpen(!othersOpen)}
-                    className="flex h-7 cursor-pointer items-center gap-2 rounded-md px-2 text-left text-xs font-medium text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:outline-none"
-                  >
-                    <ChevronDownIcon
-                      aria-hidden
-                      className={cn(
-                        "size-3 shrink-0 transition-transform",
-                        !othersOpen && "-rotate-90",
-                      )}
-                    />
-                    <span className="min-w-0 flex-1 truncate">Other projects</span>
-                    <span className="shrink-0 tabular-nums">{model.others.length}</span>
-                  </button>
-                  {othersOpen ? (
-                    <ul className="flex flex-col gap-0.5" aria-label="Other projects">
-                      {model.others.map((workspace) => (
-                        <WorkspaceRow
-                          key={workspace.key}
-                          workspace={workspace}
-                          container={null}
-                          {...rowProps}
-                        />
-                      ))}
-                    </ul>
-                  ) : null}
                 </div>
               ) : null}
             </div>
@@ -751,8 +706,8 @@ function GroupCard(props: {
 
 interface WorkspaceRowProps {
   readonly workspace: Workspace;
-  /** The list the row is dragged within; null for rows that do not drag (Other projects). */
-  readonly container: WorkspaceContainer | null;
+  /** The list the row is dragged within. */
+  readonly container: WorkspaceContainer;
   /** `Cmd+N` labels shown while the modifier is held, by workspace key. */
   readonly jumpHints: ReadonlyMap<string, string>;
   readonly activeWorkspaceKey: string | null;
@@ -771,8 +726,7 @@ function WorkspaceRow(props: WorkspaceRowProps) {
   });
   const { listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: workspace.key,
-    data: props.container === null ? {} : ({ container: props.container } satisfies DragData),
-    disabled: props.container === null,
+    data: { container: props.container } satisfies DragData,
   });
   const active = props.activeWorkspaceKey === workspace.key;
   const openCount = workspace.openTabs.length;

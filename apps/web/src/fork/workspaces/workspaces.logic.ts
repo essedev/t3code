@@ -77,8 +77,6 @@ export interface WorkspaceSidebarModel {
   readonly pinned: readonly Workspace[];
   readonly groups: readonly WorkspaceGroupView[];
   readonly ungrouped: readonly Workspace[];
-  /** Workspaces with no open tab that are neither pinned nor the one on screen. */
-  readonly others: readonly Workspace[];
   readonly needsYou: readonly WorkspaceTab[];
   readonly snoozed: readonly WorkspaceTab[];
   readonly settled: readonly WorkspaceTab[];
@@ -238,7 +236,7 @@ function buildWorkspace(
  * Builds the sidebar model. `projects` comes in the sidebar's project order, `threads` are the
  * visible thread shells, and `lastVisitedAtByKey` is this device's visit record per thread key.
  * A workspace is listed while it has an open tab, is pinned, or is `activeWorkspaceKey`; the rest
- * wait in `others` until a thread opens there again.
+ * are reached from the command palette until a thread opens there again.
  */
 export function buildWorkspaceSidebarModel(input: {
   readonly projects: readonly SidebarProjectSnapshot[];
@@ -314,7 +312,6 @@ export function buildWorkspaceSidebarModel(input: {
     });
   }
   const ungrouped = ordered.filter((workspace) => !placed.has(workspace.key) && listed(workspace));
-  const others = workspaces.filter((workspace) => !listed(workspace));
 
   const allTabs = workspaces.flatMap((workspace) => workspace.openTabs);
   return {
@@ -323,7 +320,6 @@ export function buildWorkspaceSidebarModel(input: {
     pinned,
     groups,
     ungrouped,
-    others,
     needsYou: allTabs
       .filter((tab) => tab.status?.needsYou === true)
       .toSorted(

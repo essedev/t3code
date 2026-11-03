@@ -13,11 +13,10 @@ unchanged. Design and rejected variants: DECISIONS #7 and
   opens the tab visited last on this device, else the one that matters, else a new thread.
 - **Only workspaces you are working in**: a workspace is listed while it has an open tab (pinned
   or live), is pinned, or is the one on screen. Settling or snoozing its last tab takes it off the
-  list; a new thread there, or a snooze that wakes, brings it back. The rest wait under "Other
-  projects" at the bottom, closed by default, and in the command palette. Archive a project
-  (Project settings) to drop it from Other projects too.
-- **Groups**: named cards that collect workspaces, like Relay. Create one with "New group" at the
-  bottom of the list or from a workspace's right-click menu (Move to group > New group). Rename,
+  list; a new thread there, or a snooze that wakes, brings it back. The rest are one `Cmd+N` (pick
+  a project) or Go to project away.
+- **Groups**: named cards that collect workspaces, like Relay. Create one from a workspace's right-click
+  menu (Move to group > New group) or with `Ctrl+Cmd+G`. Rename,
   reorder and delete from the group's right-click menu. A group shows only its listed members and
   hides while none is, except a new empty group, which stays so a workspace can be dragged in.
   Groups sync through server settings (`fork.workspaceGroups`); open or closed is per device. A

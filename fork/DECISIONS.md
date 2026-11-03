@@ -66,8 +66,9 @@ Status: active (2026-11-02)
 A fork-only sidebar, switchable against upstream's, lists workspaces (projects) and groups like
 Relay; threads become tabs above the chat. Each tab has upstream's sidebar status icon and today's
 thread actions; the workspace row shows the most urgent tab. A workspace is listed only while it has
-an open tab, is pinned or is on screen; the rest fold into "Other projects", because listing every
-project turned the sidebar back into an archive (rejected, 2026-11-03). Pinned tabs sit left in the strip, snoozed and settled
+an open tab, is pinned or is on screen; the rest are reached from the command palette (`Cmd+N`,
+Go to project). Rejected: listing every project, which turned the sidebar back into an archive, and
+an "Other projects" fold, which duplicated the palette (2026-11-03). Pinned tabs sit left in the strip, snoozed and settled
 fold into its `+N`; compact global rows (Needs you, Snoozed, Settled) list tabs across workspaces.
 Built in new files that import upstream's status and action logic. Concept:
 `concepts/concept-a-sidebar-workspace.html`. Rejected: an inbox shelf of tabs on top (A, pushes
