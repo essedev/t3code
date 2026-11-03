@@ -21,6 +21,11 @@ unchanged. Design and rejected variants: DECISIONS #7 and
   hides while none is, except a new empty group, which stays so a workspace can be dragged in.
   Groups sync through server settings (`fork.workspaceGroups`); open or closed is per device. A
   closed group shows the most urgent status among its workspaces.
+- **Unseen activity moves a row up**, as in Relay's sidebar: when a tab starts waiting on you
+  (approval, question, guest request, plan, failure, woke, finished unread) while you look
+  elsewhere, its workspace moves to the top of its group, or of the Workspaces list; pinned ones
+  stay. The move is saved like a drag and lasts until another one passes it or you move it. Only
+  changes seen while the app runs count, so a restart reorders nothing.
 - **Dragging**: drag a workspace up or down within its list, into a group (onto its card, open or
   closed), out of one (onto Workspaces), or into or out of the pinned list, which pins or unpins
   it; pinned and grouped are exclusive, as in Relay. Drag a tab left or right in the strip;

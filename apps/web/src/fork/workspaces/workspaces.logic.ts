@@ -483,6 +483,83 @@ export function moveWorkspace(input: {
   };
 }
 
+/** Which tabs wait on the user, per workspace, and every tab the client knew at that moment. */
+export interface NeedsYouSnapshot {
+  readonly waiting: ReadonlyMap<string, ReadonlySet<string>>;
+  readonly known: ReadonlySet<string>;
+}
+
+/** The tabs of `model` that wait on the user, and all its tabs in any section. */
+export function needsYouSnapshot(model: WorkspaceSidebarModel): NeedsYouSnapshot {
+  const known = new Set<string>();
+  const waiting = new Map<string, Set<string>>();
+  for (const workspace of model.workspaces) {
+    const tabs = [...workspace.openTabs, ...workspace.snoozedTabs, ...workspace.settledTabs];
+    for (const tab of tabs) known.add(tab.key);
+    waiting.set(
+      workspace.key,
+      new Set(
+        workspace.openTabs.filter((tab) => tab.status?.needsYou === true).map((tab) => tab.key),
+      ),
+    );
+  }
+  return { waiting, known };
+}
+
+/**
+ * The workspaces with a tab that started waiting on the user between two snapshots: Relay's
+ * "unseen activity". The tab on screen does not count, nor one the previous snapshot did not hold,
+ * so threads arriving while the app loads move nothing.
+ */
+export function newlyNeedingYou(
+  previous: NeedsYouSnapshot,
+  next: NeedsYouSnapshot,
+  activeThreadKey: string | null,
+): string[] {
+  const keys: string[] = [];
+  for (const [workspaceKey, tabKeys] of next.waiting) {
+    const before = previous.waiting.get(workspaceKey);
+    for (const tabKey of tabKeys) {
+      if (tabKey !== activeThreadKey && previous.known.has(tabKey) && !before?.has(tabKey)) {
+        keys.push(workspaceKey);
+        break;
+      }
+    }
+  }
+  return keys;
+}
+
+/**
+ * The layout after Relay's bump: a workspace with unseen activity moves to the top of its group,
+ * or of the ungrouped list; pinned ones stay. Null when nothing moves.
+ */
+export function bumpWorkspace(input: {
+  readonly groups: readonly ForkWorkspaceGroup[];
+  readonly workspaceOrder: readonly string[];
+  readonly key: string;
+  readonly pinned: boolean;
+}): { groups: ForkWorkspaceGroup[]; workspaceOrder: string[] } | null {
+  const { key } = input;
+  if (input.pinned) return null;
+  const group = input.groups.find((candidate) => candidate.projectKeys.includes(key));
+  if (group !== undefined) {
+    if (group.projectKeys[0] === key) return null;
+    return {
+      groups: input.groups.map((candidate) =>
+        candidate === group
+          ? { ...candidate, projectKeys: [key, ...candidate.projectKeys.filter((k) => k !== key)] }
+          : candidate,
+      ),
+      workspaceOrder: [...input.workspaceOrder],
+    };
+  }
+  if (input.workspaceOrder[0] === key) return null;
+  return {
+    groups: [...input.groups],
+    workspaceOrder: [key, ...input.workspaceOrder.filter((k) => k !== key)],
+  };
+}
+
 /** Groups with a new empty group appended. */
 export function addWorkspaceGroup(
   groups: readonly ForkWorkspaceGroup[],

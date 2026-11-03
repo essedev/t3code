@@ -170,6 +170,8 @@ export function useWorkspaceLayoutEditor() {
         setProjectGroupPinned(project, move.pinned);
       }
     },
+    saveLayout: (groups: ForkWorkspaceGroup[], order: string[]) =>
+      updateForkSettings({ workspaceGroups: groups, workspaceOrder: order }),
     saveTabOrder: (projectKey: string, tabKeys: readonly string[]) =>
       updateForkSettings({ tabOrder: { [projectKey]: [...tabKeys] } }),
   };

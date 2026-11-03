@@ -27,7 +27,7 @@ import {
   SquarePenIcon,
 } from "lucide-react";
 import * as Schema from "effect/Schema";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import { isCommandPaletteOpen, openCommandPalette } from "../../commandPaletteBus";
@@ -66,6 +66,10 @@ import {
 import {
   addWorkspaceGroup,
   assignWorkspaceToGroup,
+  bumpWorkspace,
+  needsYouSnapshot,
+  newlyNeedingYou,
+  type NeedsYouSnapshot,
   findWorkspaceKey,
   moveWorkspace,
   moveWorkspaceGroup,
@@ -151,6 +155,8 @@ export function WorkspaceSidebar() {
     if (groupId === undefined) createGroup(workspace.key);
     else layout.updateGroups((groups) => assignWorkspaceToGroup(groups, workspace.key, null));
   };
+
+  useBumpOnUnseenActivity(model, route.threadKey, layout);
 
   useWorkspaceShortcuts({
     model,
@@ -410,6 +416,37 @@ export function WorkspaceSidebar() {
       <SidebarChromeFooter />
     </>
   );
+}
+
+/**
+ * Relay's "chat list" order: a workspace whose tab starts waiting on the user moves to the top of
+ * its group or of the ungrouped list, and the move is saved like a drag (DECISIONS #7).
+ */
+function useBumpOnUnseenActivity(
+  model: WorkspaceSidebarModel,
+  activeThreadKey: string | null,
+  layout: ReturnType<typeof useWorkspaceLayoutEditor>,
+) {
+  const previous = useRef<NeedsYouSnapshot | null>(null);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- compares tab statuses with the previous render to bump workspaces when a tab starts waiting, then saves the order to settings
+  useEffect(() => {
+    const next = needsYouSnapshot(model);
+    const before = previous.current;
+    previous.current = next;
+    if (before === null) return;
+    let groups = layout.groups;
+    let order = layout.workspaceOrder;
+    let moved = false;
+    for (const key of newlyNeedingYou(before, next, activeThreadKey)) {
+      const pinned = model.workspaceByKey.get(key)?.project.pinned ?? false;
+      const bumped = bumpWorkspace({ groups, workspaceOrder: order, key, pinned });
+      if (bumped === null) continue;
+      groups = bumped.groups;
+      order = bumped.workspaceOrder;
+      moved = true;
+    }
+    if (moved) layout.saveLayout([...groups], [...order]);
+  }, [model, activeThreadKey, layout]);
 }
 
 /**
