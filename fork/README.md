@@ -10,16 +10,29 @@ Fork docs, all in this folder:
 - [`ROADMAP.md`](ROADMAP.md): what is in progress or next.
 - `changelog/YYYY-MM.md`: every release in order, newest first, one file per month. Written by
   `release.sh`, never by hand.
-- `features/<name>.md`: one page per fork-only feature, created with the feature.
+- `features/<name>.md`: one page per fork-only feature, created with the feature:
+  [`workspace-sidebar.md`](features/workspace-sidebar.md),
+  [`fork-settings.md`](features/fork-settings.md).
 - [`release-flow.html`](release-flow.html): visual overview of the release flow.
 
 ## Differences from upstream
 
 Every upstream file the fork changes, one row each, so a rebase conflict is easy to place. This is
-the current state, not history: a row goes away when the file matches upstream again.
-`release.sh` refuses to release while a changed file has no row or a row has no change.
+the current state, not history: a row goes away when the file matches upstream again. Files the
+fork adds need no row: they cannot conflict, and they carry "fork" in their path (DECISIONS #8).
+`release.sh` refuses to release while a changed file has no row, a row has no change, or an added
+file lacks "fork" in its path.
 
 - `apps/desktop/src/boot.ts`: telemetry and OpenTelemetry export off by default (DECISIONS #5).
+- `apps/web/src/components/AppSidebarLayout.tsx`: mounts the workspace sidebar when it is on.
+- `apps/web/src/components/ChatView.tsx`: mounts the thread tab strip under the chat header.
+- `apps/web/src/components/settings/SettingsSidebarNav.tsx`: icon of the Fork settings page.
+- `apps/web/src/components/settings/settingsSearch.ts`: Fork settings page and its search entries.
+- `apps/web/src/routeTree.gen.ts`: generated; on a conflict take upstream's and run `vp run dev`
+  once to regenerate it with the fork's settings route.
+- `apps/web/src/routes/_chat.tsx`: mounts `ForkStyles` (`fork.css` and the custom CSS).
+- `packages/contracts/src/index.ts`: exports `forkSettings.ts`.
+- `packages/contracts/src/settings.ts`: the `fork` key in server settings and their patch.
 - `CLAUDE.md`: imports this README.
 
 ## Branches and remotes
