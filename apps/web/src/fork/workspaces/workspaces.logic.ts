@@ -1,51 +1,73 @@
 /**
  * Pure model of the fork's workspace sidebar and tab strip (fork/DECISIONS.md #7): which threads
- * are tabs of which workspace, in which section, and how fork groups arrange the workspaces.
+ * are tabs of which workspace, in which section and order, which workspaces the sidebar lists, and
+ * the edits that dragging and the group menus make.
  */
 import { scopedThreadKey, scopeThreadRef } from "@t3tools/client-runtime/environment";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
-import { effectiveSnoozed } from "@t3tools/client-runtime/state/thread-settled";
+import {
+  effectiveSnoozed,
+  isThreadWokeUnseen,
+  threadWokeAt,
+} from "@t3tools/client-runtime/state/thread-settled";
 import type { ForkWorkspaceGroup } from "@t3tools/contracts";
 
 import {
-  resolveProjectStatusIndicator,
   resolveThreadLastVisitedAt,
   resolveThreadStatusPill,
   sortPinnedThreadsForSidebar,
-  type ThreadStatusPill,
 } from "../../components/Sidebar.logic";
 import type { SidebarProjectSnapshot } from "../../sidebarProjectGrouping";
 
 /** Where a tab sits: pinned and live in the strip, snoozed and settled folded into its `+N`. */
 export type TabSection = "pinned" | "live" | "snoozed" | "settled";
 
+/** The states upstream's sidebar draws an icon for, plus Plan ready. */
+export type TabStatusKind =
+  | "approval"
+  | "input"
+  | "request"
+  | "plan"
+  | "failed"
+  | "woke"
+  | "working"
+  | "waiting"
+  | "done";
+
+/** The status of a tab: what its icon shows and whether it waits on the user. */
+export interface TabStatus {
+  readonly kind: TabStatusKind;
+  readonly label: string;
+  readonly needsYou: boolean;
+}
+
 /** One thread as a tab of its workspace. */
 export interface WorkspaceTab {
   readonly key: string;
   readonly thread: EnvironmentThreadShell;
   readonly section: TabSection;
-  readonly status: ThreadStatusPill | null;
+  readonly status: TabStatus | null;
 }
 
 /** A project shown as a workspace, with its tabs split by section. */
 export interface Workspace {
   readonly key: string;
   readonly project: SidebarProjectSnapshot;
-  /** Pinned tabs first, then live tabs in creation order: the strip's order. */
+  /** Pinned tabs, then live tabs: the strip's order, dragged order first. */
   readonly openTabs: readonly WorkspaceTab[];
   readonly snoozedTabs: readonly WorkspaceTab[];
   readonly settledTabs: readonly WorkspaceTab[];
-  /** The most urgent status among the open tabs, `resolveProjectStatusIndicator`'s order. */
-  readonly status: ThreadStatusPill | null;
+  /** The most urgent status among the open tabs. */
+  readonly status: TabStatus | null;
   /** The open tab the workspace row names: the most urgent one, else the latest updated. */
   readonly leadTab: WorkspaceTab | null;
 }
 
-/** A fork group with the workspaces it lists that still exist. */
+/** A fork group with the workspaces it shows. */
 export interface WorkspaceGroupView {
   readonly group: ForkWorkspaceGroup;
   readonly workspaces: readonly Workspace[];
-  readonly status: ThreadStatusPill | null;
+  readonly status: TabStatus | null;
 }
 
 /** Everything the workspace sidebar renders. */
@@ -55,29 +77,95 @@ export interface WorkspaceSidebarModel {
   readonly pinned: readonly Workspace[];
   readonly groups: readonly WorkspaceGroupView[];
   readonly ungrouped: readonly Workspace[];
+  /** Workspaces with no open tab that are neither pinned nor the one on screen. */
+  readonly others: readonly Workspace[];
   readonly needsYou: readonly WorkspaceTab[];
   readonly snoozed: readonly WorkspaceTab[];
   readonly settled: readonly WorkspaceTab[];
 }
 
-// Statuses that wait on the user: a question, an approval, a plan, or a result not seen yet.
-const NEEDS_YOU_LABELS = new Set([
-  "Pending Approval",
-  "Awaiting Input",
-  "Guest Request",
-  "Plan Ready",
-  "Failed",
-  "Completed",
-]);
+/** A list a workspace can be dragged within or into. */
+export type WorkspaceContainer = "pinned" | "ungrouped" | `group:${string}`;
 
-/** True when the tab waits on the user. */
-function tabNeedsYou(tab: WorkspaceTab): boolean {
-  return tab.status !== null && NEEDS_YOU_LABELS.has(tab.status.label);
-}
+const STATUS_BY_PILL_LABEL: Record<string, Omit<TabStatus, "needsYou">> = {
+  "Pending Approval": { kind: "approval", label: "Approval" },
+  "Awaiting Input": { kind: "input", label: "Input" },
+  "Guest Request": { kind: "request", label: "Request" },
+  "Plan Ready": { kind: "plan", label: "Plan ready" },
+  Failed: { kind: "failed", label: "Failed" },
+  Working: { kind: "working", label: "Working" },
+  Connecting: { kind: "working", label: "Connecting" },
+  Waiting: { kind: "waiting", label: "Waiting" },
+  Completed: { kind: "done", label: "Done" },
+};
+
+// Upstream's project priority (`THREAD_STATUS_PRIORITY`), with Woke between Failed and Working.
+const STATUS_PRIORITY: Record<TabStatusKind, number> = {
+  approval: 5,
+  input: 4,
+  request: 3.75,
+  failed: 3.5,
+  woke: 3.25,
+  working: 3,
+  waiting: 2.5,
+  plan: 2,
+  done: 1,
+};
+
+const NEEDS_YOU_KINDS = new Set<TabStatusKind>([
+  "approval",
+  "input",
+  "request",
+  "plan",
+  "failed",
+  "woke",
+  "done",
+]);
 
 /** The scoped key of a thread, the same key the rest of the app uses. */
 export function threadShellKey(thread: Pick<EnvironmentThreadShell, "environmentId" | "id">) {
   return scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id));
+}
+
+/**
+ * The status of a thread at `now`: upstream's status pill, relabelled as upstream's sidebar does,
+ * with Woke when a snooze ended and nothing more urgent shows.
+ */
+function resolveTabStatus(
+  thread: EnvironmentThreadShell,
+  lastVisitedAt: string | undefined,
+  now: string,
+): TabStatus | null {
+  const pill = resolveThreadStatusPill({ thread: { ...thread, lastVisitedAt } });
+  const base = pill === null ? null : (STATUS_BY_PILL_LABEL[pill.label] ?? null);
+  const woke =
+    (base === null || base.kind === "done") &&
+    isThreadWokeUnseen({
+      wokeAt: threadWokeAt(thread, { now }),
+      settled: thread.settledOverride === "settled",
+      lastVisitedAt,
+      latestRunCompletedAt: thread.latestRun?.completedAt ?? null,
+    });
+  const resolved: Omit<TabStatus, "needsYou"> | null = woke
+    ? { kind: "woke", label: "Woke" }
+    : base?.kind === "working" && pill?.label === "Working" && thread.goal?.status === "active"
+      ? { kind: "working", label: "Goal" }
+      : base;
+  return resolved === null ? null : { ...resolved, needsYou: NEEDS_YOU_KINDS.has(resolved.kind) };
+}
+
+/** The most urgent of some statuses, or null when none is set. */
+function mostUrgentStatus(statuses: ReadonlyArray<TabStatus | null>): TabStatus | null {
+  let urgent: TabStatus | null = null;
+  for (const status of statuses) {
+    if (
+      status !== null &&
+      (urgent === null || STATUS_PRIORITY[status.kind] > STATUS_PRIORITY[urgent.kind])
+    ) {
+      urgent = status;
+    }
+  }
+  return urgent;
 }
 
 /** The section of a thread at `now`, with upstream's precedence: snoozed, settled, pinned. */
@@ -93,7 +181,20 @@ function timestampMs(value: string | null | undefined): number {
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
-function buildWorkspace(project: SidebarProjectSnapshot, tabs: readonly WorkspaceTab[]): Workspace {
+/** `items` with the ones `order` names first, in that order; the rest keep their order after. */
+function applyOrder<T>(items: readonly T[], keyOf: (item: T) => string, order: readonly string[]) {
+  const rank = new Map(order.map((key, index) => [key, index]));
+  const known = items
+    .filter((item) => rank.has(keyOf(item)))
+    .toSorted((left, right) => rank.get(keyOf(left))! - rank.get(keyOf(right))!);
+  return [...known, ...items.filter((item) => !rank.has(keyOf(item)))];
+}
+
+function buildWorkspace(
+  project: SidebarProjectSnapshot,
+  tabs: readonly WorkspaceTab[],
+  tabOrder: readonly string[],
+): Workspace {
   const pinned = sortPinnedThreadsForSidebar(
     tabs.filter((tab) => tab.section === "pinned").map((tab) => tab.thread),
   ).flatMap((thread) => tabs.find((tab) => tab.thread === thread) ?? []);
@@ -102,10 +203,11 @@ function buildWorkspace(project: SidebarProjectSnapshot, tabs: readonly Workspac
     .toSorted(
       (left, right) => timestampMs(left.thread.createdAt) - timestampMs(right.thread.createdAt),
     );
-  const openTabs = [...pinned, ...live];
-  const status = resolveProjectStatusIndicator(openTabs.map((tab) => tab.status));
+  const byKey = (tab: WorkspaceTab) => tab.key;
+  const openTabs = [...applyOrder(pinned, byKey, tabOrder), ...applyOrder(live, byKey, tabOrder)];
+  const status = mostUrgentStatus(openTabs.map((tab) => tab.status));
   const leadTab =
-    (status === null ? null : openTabs.find((tab) => tab.status?.label === status.label)) ??
+    (status === null ? null : openTabs.find((tab) => tab.status?.kind === status.kind)) ??
     openTabs.toSorted(
       (left, right) => timestampMs(right.thread.updatedAt) - timestampMs(left.thread.updatedAt),
     )[0] ??
@@ -135,12 +237,17 @@ function buildWorkspace(project: SidebarProjectSnapshot, tabs: readonly Workspac
 /**
  * Builds the sidebar model. `projects` comes in the sidebar's project order, `threads` are the
  * visible thread shells, and `lastVisitedAtByKey` is this device's visit record per thread key.
+ * A workspace is listed while it has an open tab, is pinned, or is `activeWorkspaceKey`; the rest
+ * wait in `others` until a thread opens there again.
  */
 export function buildWorkspaceSidebarModel(input: {
   readonly projects: readonly SidebarProjectSnapshot[];
   readonly threads: readonly EnvironmentThreadShell[];
   readonly lastVisitedAtByKey: Readonly<Record<string, string>>;
   readonly groups: readonly ForkWorkspaceGroup[];
+  readonly workspaceOrder?: readonly string[];
+  readonly tabOrder?: Readonly<Record<string, readonly string[]>>;
+  readonly activeWorkspaceKey?: string | null;
   /** The time to resolve snoozes at; the current time when omitted. */
   readonly now?: string;
   /** Changes when the caller's clocks tick, so a memoizing caller rebuilds. Not read. */
@@ -159,41 +266,55 @@ export function buildWorkspaceSidebarModel(input: {
     const project = projectByMember.get(`${thread.environmentId}:${thread.projectId}`);
     if (project === undefined) continue;
     const key = threadShellKey(thread);
-    const status = resolveThreadStatusPill({
-      thread: {
-        ...thread,
-        lastVisitedAt: resolveThreadLastVisitedAt(
-          thread.lastVisitedAt,
-          input.lastVisitedAtByKey[key],
-        ),
-      },
-    });
+    const lastVisitedAt = resolveThreadLastVisitedAt(
+      thread.lastVisitedAt,
+      input.lastVisitedAtByKey[key],
+    );
     const tabs = tabsByProject.get(project.projectKey) ?? [];
-    tabs.push({ key, thread, section: resolveTabSection(thread, now), status });
+    tabs.push({
+      key,
+      thread,
+      section: resolveTabSection(thread, now),
+      status: resolveTabStatus(thread, lastVisitedAt, now),
+    });
     tabsByProject.set(project.projectKey, tabs);
   }
   const workspaces = projects.map((project) =>
-    buildWorkspace(project, tabsByProject.get(project.projectKey) ?? []),
+    buildWorkspace(
+      project,
+      tabsByProject.get(project.projectKey) ?? [],
+      input.tabOrder?.[project.projectKey] ?? [],
+    ),
   );
   const workspaceByKey = new Map(workspaces.map((workspace) => [workspace.key, workspace]));
+  const listed = (workspace: Workspace) =>
+    workspace.openTabs.length > 0 ||
+    workspace.project.pinned ||
+    workspace.key === input.activeWorkspaceKey;
+  const ordered = applyOrder(workspaces, (workspace) => workspace.key, input.workspaceOrder ?? []);
 
   const placed = new Set<string>();
-  const pinned = workspaces.filter((workspace) => workspace.project.pinned);
+  const pinned = ordered.filter((workspace) => workspace.project.pinned);
   for (const workspace of pinned) placed.add(workspace.key);
-  const groups = input.groups.map((group) => {
+  const groups: WorkspaceGroupView[] = [];
+  for (const group of input.groups) {
     const members = group.projectKeys.flatMap((key) => {
       const workspace = workspaceByKey.get(key);
       if (workspace === undefined || placed.has(key)) return [];
       placed.add(key);
       return [workspace];
     });
-    return {
+    const shown = members.filter(listed);
+    // A new group shows empty so something can be dragged in; one whose members all went quiet hides.
+    if (shown.length === 0 && members.length > 0) continue;
+    groups.push({
       group,
-      workspaces: members,
-      status: resolveProjectStatusIndicator(members.map((workspace) => workspace.status)),
-    };
-  });
-  const ungrouped = workspaces.filter((workspace) => !placed.has(workspace.key));
+      workspaces: shown,
+      status: mostUrgentStatus(shown.map((workspace) => workspace.status)),
+    });
+  }
+  const ungrouped = ordered.filter((workspace) => !placed.has(workspace.key) && listed(workspace));
+  const others = workspaces.filter((workspace) => !listed(workspace));
 
   const allTabs = workspaces.flatMap((workspace) => workspace.openTabs);
   return {
@@ -202,8 +323,9 @@ export function buildWorkspaceSidebarModel(input: {
     pinned,
     groups,
     ungrouped,
+    others,
     needsYou: allTabs
-      .filter(tabNeedsYou)
+      .filter((tab) => tab.status?.needsYou === true)
       .toSorted(
         (left, right) => timestampMs(right.thread.updatedAt) - timestampMs(left.thread.updatedAt),
       ),
@@ -223,6 +345,35 @@ export function buildWorkspaceSidebarModel(input: {
   };
 }
 
+/**
+ * The workspaces `Cmd+1..9` and next/previous workspace step through: the sidebar's visible rows
+ * top to bottom, so members of a collapsed group are skipped.
+ */
+export function navigableWorkspaces(
+  model: WorkspaceSidebarModel,
+  collapsedGroupIds: readonly string[],
+): Workspace[] {
+  return [
+    ...model.pinned,
+    ...model.groups.flatMap((view) =>
+      collapsedGroupIds.includes(view.group.id) ? [] : view.workspaces,
+    ),
+    ...model.ungrouped,
+  ];
+}
+
+/** The item `offset` places from `currentKey`, wrapping; the first or last when it is absent. */
+export function stepThrough<T extends { readonly key: string }>(
+  items: readonly T[],
+  currentKey: string | null,
+  offset: 1 | -1,
+): T | null {
+  if (items.length === 0) return null;
+  const index = items.findIndex((item) => item.key === currentKey);
+  if (index === -1) return offset === 1 ? items[0]! : items[items.length - 1]!;
+  return items[(index + offset + items.length) % items.length]!;
+}
+
 /** The workspace a thread or a draft belongs to. */
 export function findWorkspaceKey(
   projects: readonly SidebarProjectSnapshot[],
@@ -236,6 +387,97 @@ export function findWorkspaceKey(
       ),
     )?.projectKey ?? null
   );
+}
+
+function arrayMove<T>(items: readonly T[], from: number, to: number): T[] {
+  const next = [...items];
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved!);
+  return next;
+}
+
+/**
+ * The open tab keys after dragging `activeKey` onto `overKey`, or null when the drop changes
+ * nothing. Pinned tabs stay ahead of live ones, so a drop across that line is ignored.
+ */
+export function reorderTabs(
+  tabs: readonly WorkspaceTab[],
+  activeKey: string,
+  overKey: string,
+): string[] | null {
+  const from = tabs.findIndex((tab) => tab.key === activeKey);
+  const to = tabs.findIndex((tab) => tab.key === overKey);
+  if (from === -1 || to === -1 || from === to) return null;
+  if (tabs[from]!.section !== tabs[to]!.section) return null;
+  return arrayMove(tabs, from, to).map((tab) => tab.key);
+}
+
+/** The result of dragging a workspace: what to save, and the pin to set when it changes. */
+export interface WorkspaceMove {
+  readonly groups: ForkWorkspaceGroup[];
+  readonly workspaceOrder: string[];
+  readonly pinned: boolean | null;
+}
+
+/**
+ * The edits for dropping workspace `key` from list `from` into list `to`, over `overKey` (the row
+ * it takes the place of) or on the list itself (`overKey` null, appended). `targetKeys` are the
+ * rows `to` shows now. Pinned and grouped are exclusive, as in Relay: entering one leaves the other.
+ */
+export function moveWorkspace(input: {
+  readonly groups: readonly ForkWorkspaceGroup[];
+  readonly workspaceOrder: readonly string[];
+  readonly key: string;
+  readonly from: WorkspaceContainer;
+  readonly to: WorkspaceContainer;
+  readonly targetKeys: readonly string[];
+  readonly overKey: string | null;
+}): WorkspaceMove {
+  const { key, from, to } = input;
+  const pinned = from === to ? null : to === "pinned" ? true : from === "pinned" ? false : null;
+  if (to.startsWith("group:")) {
+    const groupId = to.slice("group:".length);
+    const groups = input.groups.map((group) => {
+      if (group.id !== groupId) {
+        return { ...group, projectKeys: group.projectKeys.filter((member) => member !== key) };
+      }
+      const without = group.projectKeys.filter((member) => member !== key);
+      if (from === to && input.overKey !== null) {
+        const fromIndex = group.projectKeys.indexOf(key);
+        const toIndex = group.projectKeys.indexOf(input.overKey);
+        if (fromIndex !== -1 && toIndex !== -1) {
+          return { ...group, projectKeys: arrayMove(group.projectKeys, fromIndex, toIndex) };
+        }
+      }
+      const at = input.overKey === null ? -1 : without.indexOf(input.overKey);
+      return {
+        ...group,
+        projectKeys: at === -1 ? [...without, key] : without.toSpliced(at, 0, key),
+      };
+    });
+    return { groups, workspaceOrder: [...input.workspaceOrder], pinned };
+  }
+  let sequence: string[];
+  const fromIndex = input.targetKeys.indexOf(key);
+  const overIndex = input.overKey === null ? -1 : input.targetKeys.indexOf(input.overKey);
+  if (fromIndex !== -1 && overIndex !== -1) {
+    sequence = arrayMove(input.targetKeys, fromIndex, overIndex);
+  } else {
+    const without = input.targetKeys.filter((member) => member !== key);
+    const at = input.overKey === null ? -1 : without.indexOf(input.overKey);
+    sequence = at === -1 ? [...without, key] : without.toSpliced(at, 0, key);
+  }
+  return {
+    groups: input.groups.map((group) => ({
+      ...group,
+      projectKeys: group.projectKeys.filter((member) => member !== key),
+    })),
+    workspaceOrder: [
+      ...sequence,
+      ...input.workspaceOrder.filter((member) => !sequence.includes(member)),
+    ],
+    pinned,
+  };
 }
 
 /** Groups with a new empty group appended. */
@@ -274,11 +516,7 @@ export function moveWorkspaceGroup(
 ): ForkWorkspaceGroup[] {
   const from = groups.findIndex((group) => group.id === groupId);
   if (from === -1) return [...groups];
-  const to = Math.min(Math.max(from + offset, 0), groups.length - 1);
-  const next = [...groups];
-  const [moved] = next.splice(from, 1);
-  next.splice(to, 0, moved!);
-  return next;
+  return arrayMove(groups, from, Math.min(Math.max(from + offset, 0), groups.length - 1));
 }
 
 /** Groups with a workspace moved into `groupId` (appended), or out of every group with null. */
@@ -293,22 +531,5 @@ export function assignWorkspaceToGroup(
       ...group,
       projectKeys: group.id === groupId ? [...without, projectKey] : without,
     };
-  });
-}
-
-/** Groups with a workspace moved one place up or down inside its group. */
-export function moveWorkspaceInGroup(
-  groups: readonly ForkWorkspaceGroup[],
-  projectKey: string,
-  offset: number,
-): ForkWorkspaceGroup[] {
-  return groups.map((group) => {
-    const from = group.projectKeys.indexOf(projectKey);
-    if (from === -1) return group;
-    const to = Math.min(Math.max(from + offset, 0), group.projectKeys.length - 1);
-    const projectKeys = [...group.projectKeys];
-    projectKeys.splice(from, 1);
-    projectKeys.splice(to, 0, projectKey);
-    return { ...group, projectKeys };
   });
 }

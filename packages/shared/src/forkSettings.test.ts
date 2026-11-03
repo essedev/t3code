@@ -19,6 +19,8 @@ describe("fork settings", () => {
       customCss: "",
       workspaceSidebarEnabled: false,
       workspaceGroups: [],
+      workspaceOrder: [],
+      tabOrder: {},
     });
   });
 
@@ -42,5 +44,17 @@ describe("fork settings", () => {
     );
     expect(shrunk.fork.workspaceGroups).toEqual([group("work", ["b"])]);
     expect(decodeServerSettings(encodeServerSettings(shrunk)).fork).toEqual(shrunk.fork);
+  });
+
+  it("merges tab orders per workspace", () => {
+    const first = applyServerSettingsPatch(
+      DEFAULT_SERVER_SETTINGS,
+      decodeServerSettingsPatch({ fork: { tabOrder: { a: ["1", "2"], b: ["3"] } } }),
+    );
+    const second = applyServerSettingsPatch(
+      first,
+      decodeServerSettingsPatch({ fork: { tabOrder: { a: ["2"] } } }),
+    );
+    expect(second.fork.tabOrder).toEqual({ a: ["2"], b: ["3"] });
   });
 });

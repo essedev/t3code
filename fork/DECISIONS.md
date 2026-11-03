@@ -64,9 +64,10 @@ commands and a migration, the native T3 way, for the reasons above.
 Status: active (2026-11-02)
 
 A fork-only sidebar, switchable against upstream's, lists workspaces (projects) and groups like
-Relay; threads become tabs above the chat. Each tab has its status and today's thread actions; the
-workspace row shows the most urgent tab with `resolveProjectStatusIndicator`'s order (needs you >
-failed > working > finished unread > idle). Pinned tabs sit left in the strip, snoozed and settled
+Relay; threads become tabs above the chat. Each tab has upstream's sidebar status icon and today's
+thread actions; the workspace row shows the most urgent tab. A workspace is listed only while it has
+an open tab, is pinned or is on screen; the rest fold into "Other projects", because listing every
+project turned the sidebar back into an archive (rejected, 2026-11-03). Pinned tabs sit left in the strip, snoozed and settled
 fold into its `+N`; compact global rows (Needs you, Snoozed, Settled) list tabs across workspaces.
 Built in new files that import upstream's status and action logic. Concept:
 `concepts/concept-a-sidebar-workspace.html`. Rejected: an inbox shelf of tabs on top (A, pushes

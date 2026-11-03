@@ -7,6 +7,17 @@ import {
   type ProjectId,
   type ThreadId,
 } from "@t3tools/contracts";
+import {
+  closestCenter,
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import { restrictToFirstScrollableAncestor, restrictToHorizontalAxis } from "@dnd-kit/modifiers";
+import { horizontalListSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { AlarmClockIcon, CheckIcon, ChevronDownIcon, PinIcon, SquarePenIcon } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
@@ -21,11 +32,7 @@ import { isElectron } from "../../env";
 import { useClientSettings } from "../../hooks/useSettings";
 import { useThreadActionMenu } from "../../hooks/useThreadActionMenu";
 import { useThreadActions } from "../../hooks/useThreadActions";
-import {
-  resolveShortcutCommand,
-  threadJumpIndexFromCommand,
-  threadTraversalDirectionFromCommand,
-} from "../../keybindings";
+import { resolveShortcutCommand, threadTraversalDirectionFromCommand } from "../../keybindings";
 import { readLocalApi } from "../../localApi";
 import { cn } from "../../lib/utils";
 import { isTerminalFocused } from "../../lib/terminalFocus";
@@ -37,13 +44,20 @@ import { threadEnvironment } from "../../state/threads";
 import { useOrchestrationCommand } from "../../state/use-orchestration-command";
 import { selectThreadTerminalUiState, useTerminalUiStateStore } from "../../terminalUiStateStore";
 import { useForkSettings } from "../forkSettings";
-import { StatusDot, TabList } from "./WorkspaceParts";
+import { ShortcutHint, StatusIcon, TabList } from "./WorkspaceParts";
+import { useThreadJumpHintsVisible } from "../../components/Sidebar.logic";
+import { useTerminalFocus } from "../../hooks/useTerminalFocus";
+import { isMacPlatform } from "../../lib/utils";
+import { useShortcutModifierState } from "../../shortcutModifierState";
 import {
   reportThreadAction,
+  useWorkspaceLayoutEditor,
   useWorkspaceNavigation,
   useWorkspaceSidebarModel,
 } from "./useWorkspaces";
-import { findWorkspaceKey, type WorkspaceTab } from "./workspaces.logic";
+import { findWorkspaceKey, reorderTabs, stepThrough, type WorkspaceTab } from "./workspaces.logic";
+
+const TAB_DRAG_MODIFIERS = [restrictToHorizontalAxis, restrictToFirstScrollableAncestor];
 
 /**
  * The open threads of the current workspace as tabs, under the chat header. Renders nothing
@@ -69,6 +83,8 @@ function ThreadTabStripContent(props: {
   const model = useWorkspaceSidebarModel();
   const { openThread, newThreadIn } = useWorkspaceNavigation();
   const { settleThread } = useThreadActions();
+  const { saveTabOrder } = useWorkspaceLayoutEditor();
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const [parkedOpen, setParkedOpen] = useState(false);
   const workspaceKey = findWorkspaceKey(
     model.workspaces.map((workspace) => workspace.project),
@@ -88,6 +104,16 @@ function ThreadTabStripContent(props: {
   const tabs = peekTab ? [...openTabs, peekTab] : openTabs;
 
   useThreadTabShortcuts({ tabs, activeKey, routeRef: props, onOpen: openThread });
+  const modifiers = useShortcutModifierState();
+  const terminalFocus = useTerminalFocus();
+  const showTabHints = useThreadJumpHintsVisible(
+    modifiers.altKey &&
+      !modifiers.metaKey &&
+      !modifiers.ctrlKey &&
+      !modifiers.shiftKey &&
+      !terminalFocus,
+  );
+  const optionLabel = isMacPlatform(navigator.platform) ? "\u2325" : "Alt+";
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- registers the settle-and-advance handler the composer and shortcuts call, with the current tab order
   useEffect(
@@ -103,6 +129,11 @@ function ThreadTabStripContent(props: {
   );
 
   if (workspace === null) return null;
+  const onDragEnd = ({ active, over }: DragEndEvent) => {
+    if (!over) return;
+    const order = reorderTabs(openTabs, String(active.id), String(over.id));
+    if (order) saveTabOrder(workspace.key, order);
+  };
   return (
     <div
       data-thread-tab-strip
@@ -113,14 +144,28 @@ function ThreadTabStripContent(props: {
         aria-label={`Threads in ${workspace.project.displayName}`}
         className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        {tabs.map((tab) => (
-          <ThreadTab
-            key={tab.key}
-            tab={tab}
-            active={tab.key === activeKey}
-            onOpen={() => openThread(tab.thread)}
-          />
-        ))}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          modifiers={TAB_DRAG_MODIFIERS}
+          onDragEnd={onDragEnd}
+        >
+          <SortableContext
+            items={openTabs.map((tab) => tab.key)}
+            strategy={horizontalListSortingStrategy}
+          >
+            {tabs.map((tab, index) => (
+              <ThreadTab
+                key={tab.key}
+                tab={tab}
+                shortcutHint={showTabHints && index < 9 ? `${optionLabel}${index + 1}` : null}
+                active={tab.key === activeKey}
+                sortable={tab !== peekTab}
+                onOpen={() => openThread(tab.thread)}
+              />
+            ))}
+          </SortableContext>
+        </DndContext>
         {props.isServerThread ? null : (
           <div
             role="tab"
@@ -220,6 +265,10 @@ function StripIconButton(props: {
 function ThreadTab(props: {
   readonly tab: WorkspaceTab;
   readonly active: boolean;
+  /** False for the peeked snoozed or settled tab, which has no place in the order. */
+  readonly sortable: boolean;
+  /** The `Option+N` label shown while Option is held. */
+  readonly shortcutHint: string | null;
   readonly onOpen: () => void;
 }) {
   const { tab, active } = props;
@@ -227,6 +276,10 @@ function ThreadTab(props: {
   const threadRef = scopeThreadRef(thread.environmentId, thread.id);
   const [renaming, setRenaming] = useState(false);
   const tabRef = useRef<HTMLDivElement>(null);
+  const { listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: tab.key,
+    disabled: !props.sortable || renaming,
+  });
   const timestampFormat = useClientSettings((settings) => settings.timestampFormat);
   const { settleThread, snoozeThread } = useThreadActions();
   const updateThreadMetadata = useOrchestrationCommand(threadEnvironment.updateMetadata, {
@@ -287,7 +340,12 @@ function ThreadTab(props: {
 
   return (
     <div
-      ref={tabRef}
+      ref={(node) => {
+        tabRef.current = node;
+        setNodeRef(node);
+      }}
+      {...listeners}
+      style={{ transform: CSS.Translate.toString(transform), transition }}
       role="tab"
       aria-selected={active}
       tabIndex={active ? 0 : -1}
@@ -311,6 +369,7 @@ function ThreadTab(props: {
         openMenu({ x: event.clientX, y: event.clientY });
       }}
       className={cn(
+        isDragging && "z-10 shadow-sm",
         "group/tab relative flex h-7 max-w-52 min-w-28 flex-[0_1_13rem] cursor-pointer items-center gap-1.5 rounded-md pr-1 pl-2.5 text-sm outline-none select-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
         active
           ? "bg-accent text-foreground"
@@ -322,7 +381,7 @@ function ThreadTab(props: {
       {thread.pinnedAt != null ? (
         <PinIcon aria-label="Pinned" className="size-3 shrink-0 text-muted-foreground" />
       ) : null}
-      <StatusDot status={tab.status} />
+      <StatusIcon status={tab.status} />
       {renaming ? (
         <input
           autoFocus
@@ -369,13 +428,15 @@ function ThreadTab(props: {
           </StripIconButton>
         </span>
       ) : null}
+      {props.shortcutHint ? <ShortcutHint label={props.shortcutHint} /> : null}
     </div>
   );
 }
 
 /**
- * The previous, next and jump-to-thread shortcuts move between the workspace's tabs, the job
- * upstream's sidebar does when it is mounted.
+ * Tab shortcuts: upstream's previous and next thread, and Relay's `Option+1..9` and
+ * `Ctrl+Tab` / `Ctrl+Shift+Tab`, all over the workspace's tabs. `Cmd+1..9` picks a workspace
+ * (WorkspaceSidebar).
  */
 function useThreadTabShortcuts(input: {
   readonly tabs: readonly WorkspaceTab[];
@@ -392,10 +453,26 @@ function useThreadTabShortcuts(input: {
         scopeThreadRef(input.routeRef.environmentId, input.routeRef.threadId),
       ).terminalOpen,
   );
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes to window keydown for the thread navigation shortcuts with the current tab order
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes to window keydown for the tab shortcuts with the current tab order
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.repeat || isCommandPaletteOpen() || isModelPickerOpen()) {
+        return;
+      }
+      const open = (tab: WorkspaceTab | null | undefined) => {
+        if (!tab) return;
+        event.preventDefault();
+        event.stopPropagation();
+        onOpen(tab.thread);
+      };
+      // Option+digit composes a character on macOS, so match the physical key, not `event.key`.
+      const digit = /^Digit([1-9])$/.exec(event.code);
+      if (digit && event.altKey && !event.metaKey && !event.ctrlKey && !event.shiftKey) {
+        open(tabs[Number(digit[1]) - 1]);
+        return;
+      }
+      if (event.key === "Tab" && event.ctrlKey && !event.metaKey && !event.altKey) {
+        open(stepThrough(tabs, activeKey, event.shiftKey ? -1 : 1));
         return;
       }
       const command = resolveShortcutCommand(event, keybindings, {
@@ -408,21 +485,8 @@ function useThreadTabShortcuts(input: {
           isDesktop: isElectron,
         },
       });
-      const open = (tab: WorkspaceTab | undefined) => {
-        if (!tab) return;
-        event.preventDefault();
-        event.stopPropagation();
-        onOpen(tab.thread);
-      };
       const direction = threadTraversalDirectionFromCommand(command);
-      if (direction !== null) {
-        const index = tabs.findIndex((tab) => tab.key === activeKey);
-        const step = direction === "next" ? 1 : -1;
-        open(index === -1 ? tabs[0] : tabs[(index + step + tabs.length) % tabs.length]);
-        return;
-      }
-      const jumpIndex = threadJumpIndexFromCommand(command ?? "");
-      if (jumpIndex !== null) open(tabs[jumpIndex]);
+      if (direction !== null) open(stepThrough(tabs, activeKey, direction === "next" ? 1 : -1));
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);

@@ -10,6 +10,10 @@ import { selectProjectGroupingSettings } from "@t3tools/client-runtime/state/pro
 import type { ForkWorkspaceGroup } from "@t3tools/contracts";
 import { useRouter } from "@tanstack/react-router";
 
+import { useComposerDraftStore } from "../../composerDraftStore";
+import { useProjectPin } from "../../hooks/useProjectGroupUpdate";
+import { useThreadRouteTarget } from "../../hooks/useThreadRouteTarget";
+
 import { filterSidebarV2VisibleThreads, useSnoozeWakeClock } from "../../components/Sidebar.logic";
 import { toastManager } from "../../components/ui/toast";
 import { useSidebar } from "../../components/ui/sidebar";
@@ -21,24 +25,60 @@ import {
   getSidebarProjectSettingsKey,
   type SidebarProjectSnapshot,
 } from "../../sidebarProjectGrouping";
-import { useDelegatedUnderParent, useProjects, useQuietThreadShells } from "../../state/entities";
+import {
+  useDelegatedUnderParent,
+  useProjects,
+  useQuietThreadShell,
+  useQuietThreadShells,
+} from "../../state/entities";
 import { buildThreadRouteParams } from "../../threadRoutes";
 import { useUiStateStore } from "../../uiStateStore";
 import { useForkSettings, useUpdateForkSettings } from "../forkSettings";
 import {
   buildWorkspaceSidebarModel,
+  findWorkspaceKey,
   threadShellKey,
   type Workspace,
+  type WorkspaceMove,
   type WorkspaceSidebarModel,
 } from "./workspaces.logic";
 
-/** The live workspace model: projects, their tabs, statuses and the fork groups. */
+/** The thread and workspace the route shows: a server thread, or a draft's project. */
+export function useRouteWorkspaceRef(): {
+  readonly threadKey: string | null;
+  readonly projectRef: { readonly environmentId: string; readonly projectId: string } | null;
+} {
+  const target = useThreadRouteTarget();
+  const thread = useQuietThreadShell(target?.kind === "server" ? target.threadRef : null);
+  const draft = useComposerDraftStore((store) =>
+    target?.kind === "draft" ? store.getDraftSession(target.draftId) : null,
+  );
+  if (thread) {
+    return {
+      threadKey: threadShellKey(thread),
+      projectRef: { environmentId: thread.environmentId, projectId: thread.projectId },
+    };
+  }
+  if (draft) {
+    return {
+      threadKey: null,
+      projectRef: { environmentId: draft.environmentId, projectId: draft.projectId },
+    };
+  }
+  return { threadKey: null, projectRef: null };
+}
+
+/**
+ * The live workspace model: projects, their tabs, statuses, the fork groups and the dragged
+ * order, with the workspace on screen listed even when it has no open tab.
+ */
 export function useWorkspaceSidebarModel(): WorkspaceSidebarModel {
   const projects = useSidebarProjectGroups();
   const threads = useQuietThreadShells();
   const delegatedUnderParent = useDelegatedUnderParent();
   const lastVisitedAtByKey = useUiStateStore((state) => state.threadLastVisitedAtById);
-  const { workspaceGroups } = useForkSettings();
+  const { workspaceGroups, workspaceOrder, tabOrder } = useForkSettings();
+  const route = useRouteWorkspaceRef();
   // Both clocks re-render this hook when a snooze wakes or a minute passes, and the model reads
   // the time when it builds, so sections and statuses follow the clock.
   const minute = useNowMinute();
@@ -48,6 +88,10 @@ export function useWorkspaceSidebarModel(): WorkspaceSidebarModel {
     threads: filterSidebarV2VisibleThreads(threads, null, delegatedUnderParent),
     lastVisitedAtByKey,
     groups: workspaceGroups,
+    workspaceOrder,
+    tabOrder,
+    activeWorkspaceKey:
+      route.projectRef === null ? null : findWorkspaceKey(projects, route.projectRef),
     clockKey: `${minute}:${snoozeClock}`,
   });
 }
@@ -105,14 +149,29 @@ export function useWorkspaceNavigation() {
   return { openThread, openWorkspace, newThreadIn, openProjectSettings };
 }
 
-/** Saves group edits as a whole new list, so concurrent clients converge on the last write. */
-export function useWorkspaceGroupsEditor() {
-  const { workspaceGroups } = useForkSettings();
+/**
+ * Group, order and tab order edits. Groups and the workspace order save as whole lists, so
+ * concurrent clients converge on the last write; a tab order saves per workspace.
+ */
+export function useWorkspaceLayoutEditor() {
+  const { workspaceGroups, workspaceOrder } = useForkSettings();
   const updateForkSettings = useUpdateForkSettings();
+  const { canPinProjectGroup, setProjectGroupPinned } = useProjectPin();
   return {
     groups: workspaceGroups,
-    update: (edit: (groups: readonly ForkWorkspaceGroup[]) => ForkWorkspaceGroup[]) =>
+    workspaceOrder,
+    updateGroups: (edit: (groups: readonly ForkWorkspaceGroup[]) => ForkWorkspaceGroup[]) =>
       updateForkSettings({ workspaceGroups: edit(workspaceGroups) }),
+    /** Whether `project` can be pinned or unpinned from here. */
+    canPin: canPinProjectGroup,
+    applyMove: (project: SidebarProjectSnapshot, move: WorkspaceMove) => {
+      updateForkSettings({ workspaceGroups: move.groups, workspaceOrder: move.workspaceOrder });
+      if (move.pinned !== null && canPinProjectGroup(project)) {
+        setProjectGroupPinned(project, move.pinned);
+      }
+    },
+    saveTabOrder: (projectKey: string, tabKeys: readonly string[]) =>
+      updateForkSettings({ tabOrder: { [projectKey]: [...tabKeys] } }),
   };
 }
 
