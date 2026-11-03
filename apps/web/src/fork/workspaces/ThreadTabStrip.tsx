@@ -226,42 +226,44 @@ function ThreadTabStripContent(props: {
           </div>
         )}
       </div>
-      {parkedTabs.length > 0 ? (
-        <Popover open={parkedOpen} onOpenChange={setParkedOpen}>
-          <PopoverTrigger
-            render={
-              <Button
-                size="compact"
-                variant="ghost-muted"
-                aria-label={`${parkedTabs.length} snoozed and settled threads`}
-              />
-            }
-          >
-            +{parkedTabs.length}
-            <ChevronDownIcon aria-hidden />
-          </PopoverTrigger>
-          <PopoverPopup side="bottom" align="end" padding="none">
-            <div className="w-[30rem] max-w-[calc(100vw-2rem)]">
-              <LocalTabPicker
-                label={`Parked threads in ${workspace.project.displayName}`}
-                sections={[
-                  { kind: "snoozed", label: "Snoozed", tabs: workspace.snoozedTabs },
-                  { kind: "settled", label: "Settled", tabs: workspace.settledTabs },
-                ]}
-                placeholder="Search snoozed and settled threads…"
-                emptyLabel="No snoozed or settled threads."
-                onOpened={() => setParkedOpen(false)}
-              />
-            </div>
-          </PopoverPopup>
-        </Popover>
-      ) : null}
-      <StripIconButton
-        label={`New thread in ${workspace.project.displayName}`}
-        onClick={() => newThreadIn(workspace.project)}
-      >
-        <SquarePenIcon />
-      </StripIconButton>
+      <div className="flex h-7 shrink-0 items-center gap-1">
+        {parkedTabs.length > 0 ? (
+          <Popover open={parkedOpen} onOpenChange={setParkedOpen}>
+            <PopoverTrigger
+              render={
+                <Button
+                  size="compact"
+                  variant="ghost-muted"
+                  aria-label={`${parkedTabs.length} snoozed and settled threads`}
+                />
+              }
+            >
+              +{parkedTabs.length}
+              <ChevronDownIcon aria-hidden />
+            </PopoverTrigger>
+            <PopoverPopup side="bottom" align="end" padding="none">
+              <div className="w-[30rem] max-w-[calc(100vw-2rem)]">
+                <LocalTabPicker
+                  label={`Parked threads in ${workspace.project.displayName}`}
+                  sections={[
+                    { kind: "snoozed", label: "Snoozed", tabs: workspace.snoozedTabs },
+                    { kind: "settled", label: "Settled", tabs: workspace.settledTabs },
+                  ]}
+                  placeholder="Search snoozed and settled threads…"
+                  emptyLabel="No snoozed or settled threads."
+                  onOpened={() => setParkedOpen(false)}
+                />
+              </div>
+            </PopoverPopup>
+          </Popover>
+        ) : null}
+        <StripIconButton
+          label={`New thread in ${workspace.project.displayName}`}
+          onClick={() => newThreadIn(workspace.project)}
+        >
+          <SquarePenIcon />
+        </StripIconButton>
+      </div>
     </div>
   );
 }
