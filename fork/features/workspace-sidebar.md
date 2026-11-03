@@ -40,19 +40,19 @@ unchanged. Design and rejected variants: DECISIONS #7 and
   Request, Failed, Woke, Done), plus Plan ready, which upstream's sidebar does not draw.
 - **Shortcuts**, Relay's two axes (fixed, not remappable):
 
-  | Keys                         | Action                                                                              |
-  | ---------------------------- | ----------------------------------------------------------------------------------- |
-  | `Cmd+1..9`                   | Workspace N among the visible rows (desktop app; upstream's jump-to-thread binding) |
-  | `Option+1..9`                | Tab N of the current workspace                                                      |
-  | `Option+Cmd+Up/Down`         | Previous or next workspace                                                          |
-  | `Ctrl+Tab`, `Ctrl+Shift+Tab` | Next or previous tab (also upstream's `Cmd+Shift+]` and `[`)                        |
-  | `Option+Cmd+J`, `+Shift`     | Next or previous thread in Needs you                                                |
-  | `Ctrl+Cmd+G`                 | Ungroup the current workspace, or start a new group with it                         |
+  | Keys                         | Action                                                                               |
+  | ---------------------------- | ------------------------------------------------------------------------------------ |
+  | `Cmd+T`                      | New thread (a new tab) in the current workspace; in the right panel, its own new tab |
+  | `Cmd+1..9`                   | Workspace N among the visible rows (desktop app; upstream's jump-to-thread binding)  |
+  | `Option+1..9`                | Tab N of the current workspace                                                       |
+  | `Option+Cmd+Up/Down`         | Previous or next workspace                                                           |
+  | `Ctrl+Tab`, `Ctrl+Shift+Tab` | Next or previous tab (also upstream's `Cmd+Shift+]` and `[`)                         |
+  | `Option+Cmd+J`, `+Shift`     | Next or previous thread in Needs you                                                 |
+  | `Ctrl+Cmd+G`                 | Ungroup the current workspace, or start a new group with it                          |
 
   Holding `Cmd` or `Option` for a moment shows the numbers on the rows and tabs, like upstream's
-  jump hints. Relay's `Cmd+J`, `Cmd+T`, `Cmd+W`, `Cmd+D` and `Cmd+P` stay upstream's (terminal,
-  right panel, diff, file picker); `Cmd+N` already starts a thread in the current workspace and
-  `Cmd+Shift+S` settles. Settle-and-advance settles the tab and opens the next one.
+  jump hints. Relay's `Cmd+J`, `Cmd+W`, `Cmd+D` and `Cmd+P` stay upstream's (terminal, right
+  panel, diff, file picker); `Cmd+Shift+S` settles. Settle-and-advance settles the tab and opens the next one.
 
 ## How it is built
 

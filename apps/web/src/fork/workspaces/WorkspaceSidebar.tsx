@@ -458,10 +458,8 @@ export function WorkspaceSidebar() {
 }
 
 /**
- * Relay's workspace shortcuts: `Cmd+1..9` (upstream's jump-to-thread binding) picks a visible
- * workspace, `Option+Cmd+Up/Down` steps through them, `Option+Cmd+J` (`+Shift` backwards) goes to
- * the next thread that needs you, `Ctrl+Cmd+G` groups or ungroups the current workspace. Relay's
- * `Cmd+J` stays upstream's terminal toggle.
+ * Relay's workspace shortcuts (fork/features/workspace-sidebar.md): Cmd+T, Cmd+1..9,
+ * Option+Cmd+Up/Down, Option+Cmd+J and Ctrl+Cmd+G.
  */
 function useWorkspaceShortcuts(input: {
   readonly model: WorkspaceSidebarModel;
@@ -471,8 +469,27 @@ function useWorkspaceShortcuts(input: {
   readonly onToggleGroup: (workspace: Workspace) => void;
 }) {
   const { model, collapsedGroupIds, activeWorkspaceKey, activeThreadKey, onToggleGroup } = input;
-  const { openWorkspace, openThread } = useWorkspaceNavigation();
+  const { openWorkspace, openThread, newThreadIn } = useWorkspaceNavigation();
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes to window keydown in the capture phase so Cmd+T reaches the strip before the right panel's own Cmd+T
+  useEffect(() => {
+    const isMac = isMacPlatform(navigator.platform);
+    const onKeyDown = (event: KeyboardEvent) => {
+      const mod = isMac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
+      if (!mod || event.altKey || event.shiftKey || event.code !== "KeyT") return;
+      if (event.defaultPrevented || isCommandPaletteOpen() || isModelPickerOpen()) return;
+      // Inside the right panel, Cmd+T stays upstream's new panel tab.
+      if (document.activeElement?.closest('[data-workspace-area="panel"]')) return;
+      const current =
+        activeWorkspaceKey === null ? undefined : model.workspaceByKey.get(activeWorkspaceKey);
+      if (!current) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (!event.repeat) newThreadIn(current.project);
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [model, activeWorkspaceKey, newThreadIn]);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes to window keydown for the workspace shortcuts with the current sidebar order
   useEffect(() => {
     const isMac = isMacPlatform(navigator.platform);
