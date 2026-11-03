@@ -16,16 +16,7 @@ import {
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import {
-  AlarmClockIcon,
-  BellDotIcon,
-  CheckCheckIcon,
-  ChevronDownIcon,
-  FolderPlusIcon,
-  PinIcon,
-  SearchIcon,
-  SquarePenIcon,
-} from "lucide-react";
+import { ChevronDownIcon, FolderPlusIcon, PinIcon, SearchIcon, SquarePenIcon } from "lucide-react";
 import * as Schema from "effect/Schema";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -34,7 +25,6 @@ import { isCommandPaletteOpen, openCommandPalette } from "../../commandPaletteBu
 import { ProjectFavicon } from "../../components/ProjectFavicon";
 import { SidebarChromeFooter, SidebarChromeHeader } from "../../components/sidebar/SidebarChrome";
 import { Button } from "../../components/ui/button";
-import { Popover, PopoverPopup, PopoverTrigger } from "../../components/ui/popover";
 import { SidebarContent, SidebarGroup } from "../../components/ui/sidebar";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../../components/ui/tooltip";
 import { isElectron } from "../../env";
@@ -56,7 +46,8 @@ import { isTerminalFocused } from "../../lib/terminalFocus";
 import { isModelPickerOpen } from "../../modelPickerVisibility";
 import { primaryServerKeybindingsAtom } from "../../state/server";
 import { toastManager } from "../../components/ui/toast";
-import { ShortcutHint, StatusIcon, statusColorClass, TabList } from "./WorkspaceParts";
+import { GlobalRows } from "./GlobalRows";
+import { ShortcutHint, StatusIcon, statusColorClass } from "./WorkspaceParts";
 import {
   useRouteWorkspaceRef,
   useWorkspaceLayoutEditor,
@@ -945,89 +936,4 @@ async function openGroupMenu(
     ),
   );
   return clicked._tag === "Failure" ? null : clicked.value;
-}
-
-/** Needs you, Snoozed and Settled across every workspace, outside the scrolling list. */
-function GlobalRows(props: { readonly model: WorkspaceSidebarModel }) {
-  const { model } = props;
-  const workspaceNameOf = (tab: WorkspaceTab) =>
-    model.workspaces.find((workspace) =>
-      workspace.project.memberProjectRefs.some(
-        (ref) =>
-          ref.environmentId === tab.thread.environmentId && ref.projectId === tab.thread.projectId,
-      ),
-    )?.project.displayName ?? null;
-  return (
-    <div className="flex flex-col gap-0.5 border-t border-sidebar-border/70 px-(--sidebar-content-inset) py-1.5">
-      <GlobalRow
-        icon={<BellDotIcon />}
-        label="Needs you"
-        tabs={model.needsYou}
-        kind="needs-you"
-        emptyLabel="Nothing waits on you."
-        workspaceNameOf={workspaceNameOf}
-        highlight={model.needsYou.length > 0}
-      />
-      <GlobalRow
-        icon={<AlarmClockIcon />}
-        label="Snoozed"
-        tabs={model.snoozed}
-        kind="snoozed"
-        emptyLabel="No snoozed threads."
-        workspaceNameOf={workspaceNameOf}
-      />
-      <GlobalRow
-        icon={<CheckCheckIcon />}
-        label="Settled"
-        tabs={model.settled}
-        kind="settled"
-        emptyLabel="No settled threads."
-        workspaceNameOf={workspaceNameOf}
-      />
-    </div>
-  );
-}
-
-function GlobalRow(props: {
-  readonly icon: ReactNode;
-  readonly label: string;
-  readonly tabs: readonly WorkspaceTab[];
-  readonly kind: "needs-you" | "snoozed" | "settled";
-  readonly emptyLabel: string;
-  readonly workspaceNameOf: (tab: WorkspaceTab) => string | null;
-  readonly highlight?: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
-        render={
-          <button
-            type="button"
-            className="flex h-7 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-left text-xs text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:outline-none [&_svg]:size-3.5 [&_svg]:shrink-0"
-          />
-        }
-      >
-        {props.icon}
-        <span className={cn("flex-1", props.highlight && "font-medium text-sidebar-foreground")}>
-          {props.label}
-        </span>
-        <span className="tabular-nums">{props.tabs.length}</span>
-      </PopoverTrigger>
-      <PopoverPopup side="right" align="end" width="md" padding="none">
-        <div className="max-h-[min(28rem,70dvh)] overflow-y-auto">
-          <h2 className="px-3 pt-2.5 pb-1 text-xs font-medium text-muted-foreground">
-            {props.label}
-          </h2>
-          <TabList
-            tabs={props.tabs}
-            kind={props.kind}
-            workspaceNameOf={props.workspaceNameOf}
-            emptyLabel={props.emptyLabel}
-            onOpened={() => setOpen(false)}
-          />
-        </div>
-      </PopoverPopup>
-    </Popover>
-  );
 }
