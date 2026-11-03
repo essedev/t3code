@@ -44,7 +44,8 @@ import { threadEnvironment } from "../../state/threads";
 import { useOrchestrationCommand } from "../../state/use-orchestration-command";
 import { selectThreadTerminalUiState, useTerminalUiStateStore } from "../../terminalUiStateStore";
 import { useForkSettings } from "../forkSettings";
-import { ShortcutHint, StatusIcon, TabList } from "./WorkspaceParts";
+import { LocalTabPicker } from "./TabPicker";
+import { ShortcutHint, StatusIcon } from "./WorkspaceParts";
 import { useThreadJumpHintsVisible } from "../../components/Sidebar.logic";
 import { useTerminalFocus } from "../../hooks/useTerminalFocus";
 import { isMacPlatform } from "../../lib/utils";
@@ -239,34 +240,18 @@ function ThreadTabStripContent(props: {
             +{parkedTabs.length}
             <ChevronDownIcon aria-hidden />
           </PopoverTrigger>
-          <PopoverPopup side="bottom" align="end" width="md" padding="none">
-            <div className="max-h-[min(28rem,70dvh)] overflow-y-auto">
-              {workspace.snoozedTabs.length > 0 ? (
-                <>
-                  <h2 className="px-3 pt-2.5 pb-1 text-xs font-medium text-muted-foreground">
-                    Snoozed
-                  </h2>
-                  <TabList
-                    tabs={workspace.snoozedTabs}
-                    kind="snoozed"
-                    emptyLabel=""
-                    onOpened={() => setParkedOpen(false)}
-                  />
-                </>
-              ) : null}
-              {workspace.settledTabs.length > 0 ? (
-                <>
-                  <h2 className="px-3 pt-2.5 pb-1 text-xs font-medium text-muted-foreground">
-                    Settled
-                  </h2>
-                  <TabList
-                    tabs={workspace.settledTabs}
-                    kind="settled"
-                    emptyLabel=""
-                    onOpened={() => setParkedOpen(false)}
-                  />
-                </>
-              ) : null}
+          <PopoverPopup side="bottom" align="end" padding="none">
+            <div className="w-[30rem] max-w-[calc(100vw-2rem)]">
+              <LocalTabPicker
+                label={`Parked threads in ${workspace.project.displayName}`}
+                sections={[
+                  { kind: "snoozed", label: "Snoozed", tabs: workspace.snoozedTabs },
+                  { kind: "settled", label: "Settled", tabs: workspace.settledTabs },
+                ]}
+                placeholder="Search snoozed and settled threads…"
+                emptyLabel="No snoozed or settled threads."
+                onOpened={() => setParkedOpen(false)}
+              />
             </div>
           </PopoverPopup>
         </Popover>

@@ -575,6 +575,32 @@ export function bumpWorkspace(input: {
   };
 }
 
+function foldForSearch(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase();
+}
+
+/**
+ * The tabs a list search keeps: those whose title or workspace name holds the query (accents and
+ * case ignored) first, then those the server found by message text (`matchedKeys`), each group in
+ * the list's order. Every tab when the query is blank.
+ */
+export function searchTabs(
+  tabs: readonly WorkspaceTab[],
+  query: string,
+  workspaceNameOf: (tab: WorkspaceTab) => string | null,
+  matchedKeys: ReadonlySet<string> = new Set(),
+): WorkspaceTab[] {
+  const folded = foldForSearch(query.trim());
+  if (folded === "") return [...tabs];
+  const byText = (tab: WorkspaceTab) =>
+    foldForSearch(`${tab.thread.title} ${workspaceNameOf(tab) ?? ""}`).includes(folded);
+  const titled = tabs.filter(byText);
+  return [...titled, ...tabs.filter((tab) => !byText(tab) && matchedKeys.has(tab.key))];
+}
+
 /** Groups with a new empty group appended. */
 export function addWorkspaceGroup(
   groups: readonly ForkWorkspaceGroup[],
