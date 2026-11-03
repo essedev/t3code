@@ -51,9 +51,13 @@ echo "Upstream base: $base_tag"
 echo "Fork release:  $version ($tag)"
 
 # Every upstream file the fork changes must have a row in the README's "Differences from upstream".
+# Files the fork adds cannot conflict on a rebase, so they need no row, only "fork" in their path.
 listed="$(awk '/^## Differences from upstream/{f=1;next} /^## /{f=0} f' fork/README.md |
   sed -nE 's/^- `([^`]+)`.*/\1/p' | sort -u)"
-changed="$(git diff --name-only "$base_tag" HEAD -- . ':(exclude)fork' | sort -u)"
+changed="$(git diff --name-only --diff-filter=MDRT "$base_tag" HEAD -- . ':(exclude)fork' | sort -u)"
+unmarked="$(git diff --name-only --diff-filter=A "$base_tag" HEAD -- . ':(exclude)fork' | grep -iv fork || true)"
+[ -z "$unmarked" ] || fail "files added by the fork need \"fork\" in their path:
+$unmarked"
 missing="$(comm -23 <(printf '%s\n' "$changed" | sed '/^$/d') <(printf '%s\n' "$listed" | sed '/^$/d'))"
 stale="$(comm -13 <(printf '%s\n' "$changed" | sed '/^$/d') <(printf '%s\n' "$listed" | sed '/^$/d'))"
 [ -z "$missing" ] || fail "add these files to 'Differences from upstream' in fork/README.md:
