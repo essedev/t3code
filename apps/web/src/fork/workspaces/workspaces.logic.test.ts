@@ -57,6 +57,14 @@ function thread(id: string, projectKey: string, overrides: Partial<EnvironmentTh
 
 const group = (id: string, projectKeys: string[]) => ({ id, name: id, projectKeys });
 
+function listedKeys(model: ReturnType<typeof buildWorkspaceSidebarModel>): string[] {
+  return [
+    ...model.pinned,
+    ...model.groups.flatMap((view) => view.workspaces),
+    ...model.ungrouped,
+  ].map((workspace) => workspace.key);
+}
+
 describe("buildWorkspaceSidebarModel", () => {
   it("splits tabs by section and orders pinned, then live by creation", () => {
     const model = buildWorkspaceSidebarModel({
@@ -171,7 +179,9 @@ describe("buildWorkspaceSidebarModel", () => {
       ["new", []],
     ]);
     expect(model.ungrouped.map((workspace) => workspace.key)).toEqual(["current", "b"]);
-    expect(model.others.map((workspace) => workspace.key)).toEqual(["quiet", "idle"]);
+    expect(
+      model.workspaces.filter((ws) => !listedKeys(model).includes(ws.key)).map((ws) => ws.key),
+    ).toEqual(["quiet", "idle"]);
   });
 });
 
