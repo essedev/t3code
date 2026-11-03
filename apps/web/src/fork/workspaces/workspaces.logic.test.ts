@@ -11,6 +11,7 @@ import {
   removeWorkspaceGroup,
   renameWorkspaceGroup,
   reorderTabs,
+  tabAfterClosing,
 } from "./workspaces.logic";
 
 const NOW = "2026-11-02T16:20:00.000Z";
@@ -112,6 +113,8 @@ describe("buildWorkspaceSidebarModel", () => {
       now: NOW,
     }).workspaceByKey.get("t3code")!;
     expect(dragged.openTabs.map((tab) => tab.thread.id)).toEqual(["late", "early", "new"]);
+    expect(tabAfterClosing(dragged.openTabs, "local:early")?.thread.id).toBe("new");
+    expect(tabAfterClosing(dragged.openTabs, "local:new")?.thread.id).toBe("early");
     expect(reorderTabs(dragged.openTabs, "local:new", "local:late")).toEqual([
       "local:new",
       "local:late",
