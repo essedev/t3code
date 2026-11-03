@@ -9,6 +9,7 @@ import { resolveThreadRouteTarget, type ThreadRouteTarget } from "../threadRoute
 import { retainThreadFindForRoute } from "../components/chat/threadFindStore";
 import { ThreadLinkPrompt } from "../components/promptLinks/ThreadLinkPrompt";
 import { useThreadRouteTarget } from "../hooks/useThreadRouteTarget";
+import { ForkStyles } from "../fork/ForkStyles";
 
 function threadRouteTargetKey(target: ThreadRouteTarget | null) {
   if (!target) return null;
@@ -30,6 +31,7 @@ function ChatRouteLayout() {
   const shownTarget = modalOpen ? backgroundTarget : threadTarget;
   return (
     <>
+      <ForkStyles />
       {shownTarget?.kind === "server" && !modalOpen ? (
         <ThreadLinkPrompt threadRef={shownTarget.threadRef} />
       ) : null}

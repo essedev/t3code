@@ -1,0 +1,9 @@
+/*
+ * Fork base styles, loaded after the app's own. The Custom CSS field in Settings > Fork is applied
+ * after this file, so it can override anything here.
+ */
+
+/* The thread details card reads poorly over busy chat content at the app-wide glass opacity. */
+[data-thread-details-card] {
+  --glass-opacity: 96%;
+}

@@ -37,6 +37,7 @@ export type SettingsPath =
   | "/settings/secrets"
   | "/settings/maintenance"
   | "/settings/labs"
+  | "/settings/fork"
   | "/settings/about"
   | "/settings/archived";
 
@@ -112,6 +113,7 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/secrets": "Secrets",
   "/settings/maintenance": "Maintenance",
   "/settings/labs": "Labs",
+  "/settings/fork": "Fork",
   "/settings/about": "About",
   "/settings/voice": "Voice",
   "/settings/archived": "Archive",
@@ -158,7 +160,13 @@ export const SETTINGS_NAV_GROUPS: ReadonlyArray<{
   },
   {
     heading: null,
-    paths: ["/settings/maintenance", "/settings/labs", "/settings/about", "/settings/archived"],
+    paths: [
+      "/settings/maintenance",
+      "/settings/labs",
+      "/settings/fork",
+      "/settings/about",
+      "/settings/archived",
+    ],
   },
 ];
 
@@ -490,6 +498,18 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: [
       "accessibility a11y screen reader nvda jaws voiceover orca narrator speech announce read aloud messages activity steps",
     ],
+  },
+  {
+    id: "fork-workspace-sidebar",
+    title: "Workspace sidebar",
+    to: "/settings/fork",
+    searchTerms: ["fork workspaces tabs projects groups relay sidebar"],
+  },
+  {
+    id: "fork-custom-css",
+    title: "Custom CSS",
+    to: "/settings/fork",
+    searchTerms: ["fork style stylesheet theme override card opacity"],
   },
   {
     id: "guest-links",
@@ -1356,6 +1376,7 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
   "/settings/scheduled-tasks": null,
   "/settings/maintenance": null,
   "/settings/labs": null,
+  "/settings/fork": null,
   "/settings/about": null,
   "/settings/archived": "project-defaults",
 };
