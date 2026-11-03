@@ -178,7 +178,7 @@ function ThreadTabStripContent(props: {
   return (
     <div
       data-thread-tab-strip
-      className="flex h-10 shrink-0 items-center gap-1 border-b border-border px-2 sm:px-3"
+      className="flex h-8 shrink-0 items-start gap-1 border-b border-border px-2 sm:px-3"
     >
       <div
         role="tablist"
