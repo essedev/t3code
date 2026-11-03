@@ -6,10 +6,11 @@ import type { SidebarProjectSnapshot } from "../../sidebarProjectGrouping";
 import {
   assignWorkspaceToGroup,
   buildWorkspaceSidebarModel,
+  moveWorkspace,
   moveWorkspaceGroup,
-  moveWorkspaceInGroup,
   removeWorkspaceGroup,
   renameWorkspaceGroup,
+  reorderTabs,
 } from "./workspaces.logic";
 
 const NOW = "2026-11-02T16:20:00.000Z";
@@ -87,6 +88,27 @@ describe("buildWorkspaceSidebarModel", () => {
     ]);
     expect(workspace.snoozedTabs.map((tab) => tab.thread.id)).toEqual(["snoozed"]);
     expect(workspace.settledTabs.map((tab) => tab.thread.id)).toEqual(["settled"]);
+    expect(workspace.openTabs.find((tab) => tab.thread.id === "woke")?.status?.kind).toBe("woke");
+
+    const dragged = buildWorkspaceSidebarModel({
+      projects: [project("t3code")],
+      threads: [
+        thread("late", "t3code", { createdAt: "2026-11-02T09:00:00.000Z" }),
+        thread("early", "t3code", { createdAt: "2026-11-01T09:00:00.000Z" }),
+        thread("new", "t3code", { createdAt: "2026-11-02T10:00:00.000Z" }),
+      ],
+      lastVisitedAtByKey: {},
+      groups: [],
+      // A tab the saved order does not name yet goes to the end, like a new browser tab.
+      tabOrder: { t3code: ["local:late", "local:early", "local:gone"] },
+      now: NOW,
+    }).workspaceByKey.get("t3code")!;
+    expect(dragged.openTabs.map((tab) => tab.thread.id)).toEqual(["late", "early", "new"]);
+    expect(reorderTabs(dragged.openTabs, "local:new", "local:late")).toEqual([
+      "local:new",
+      "local:late",
+      "local:early",
+    ]);
   });
 
   it("badges the workspace with the most urgent open tab and lists it under Needs you", () => {
@@ -104,24 +126,40 @@ describe("buildWorkspaceSidebarModel", () => {
       now: NOW,
     });
     const workspace = model.workspaceByKey.get("relay")!;
-    expect(workspace.status?.label).toBe("Awaiting Input");
+    expect(workspace.status).toEqual({ kind: "input", label: "Input", needsYou: true });
     expect(workspace.leadTab?.thread.id).toBe("asking");
     expect(model.needsYou.map((tab) => tab.thread.id)).toEqual(["asking"]);
   });
 
-  it("places pinned workspaces on top, then groups in order, then the rest", () => {
+  it("lists pinned, then groups, then the rest, and only workspaces with open tabs", () => {
     const model = buildWorkspaceSidebarModel({
       projects: [
         project("a"),
         project("b"),
         project("c", { pinned: true }),
         project("d"),
+        project("quiet"),
+        project("idle"),
+        project("current"),
         project("gone", { archived: true }),
       ],
-      threads: [],
+      threads: [
+        thread("a1", "a"),
+        thread("b1", "b"),
+        thread("d1", "d"),
+        thread("idle1", "idle", { settledOverride: "settled" }),
+      ],
       lastVisitedAtByKey: {},
-      // "c" is pinned and "missing" no longer exists, so neither shows in a group.
-      groups: [group("work", ["d", "c", "missing"]), group("side", ["a", "d"])],
+      // "c" is pinned and "missing" no longer exists, so neither shows in a group. "rest" has
+      // only a quiet member and hides; "new" has no members and shows so a row can be dropped in.
+      groups: [
+        group("work", ["d", "c", "missing"]),
+        group("side", ["a", "d", "quiet"]),
+        group("rest", ["idle"]),
+        group("new", []),
+      ],
+      workspaceOrder: ["current", "b"],
+      activeWorkspaceKey: "current",
       now: NOW,
     });
     expect(model.pinned.map((workspace) => workspace.key)).toEqual(["c"]);
@@ -130,8 +168,10 @@ describe("buildWorkspaceSidebarModel", () => {
     ).toEqual([
       ["work", ["d"]],
       ["side", ["a"]],
+      ["new", []],
     ]);
-    expect(model.ungrouped.map((workspace) => workspace.key)).toEqual(["b"]);
+    expect(model.ungrouped.map((workspace) => workspace.key)).toEqual(["current", "b"]);
+    expect(model.others.map((workspace) => workspace.key)).toEqual(["quiet", "idle"]);
   });
 });
 
@@ -149,11 +189,55 @@ describe("workspace group edits", () => {
     ]);
   });
 
-  it("reorders groups and workspaces within a group, clamped at the ends", () => {
+  it("reorders groups, clamped at the ends", () => {
     expect(moveWorkspaceGroup(groups, "two", -1).map((g) => g.id)).toEqual(["two", "one"]);
     expect(moveWorkspaceGroup(groups, "two", 1).map((g) => g.id)).toEqual(["one", "two"]);
-    expect(moveWorkspaceInGroup(groups, "b", -1)[0]!.projectKeys).toEqual(["b", "a"]);
-    expect(moveWorkspaceInGroup(groups, "a", -1)[0]!.projectKeys).toEqual(["a", "b"]);
+  });
+
+  it("drags a workspace within a group, across groups, out of them and into pinned", () => {
+    const base = { groups, workspaceOrder: ["x", "y"] };
+    const within = moveWorkspace({
+      ...base,
+      key: "b",
+      from: "group:one",
+      to: "group:one",
+      targetKeys: ["a", "b"],
+      overKey: "a",
+    });
+    expect(within.groups[0]!.projectKeys).toEqual(["b", "a"]);
+    expect(within.pinned).toBeNull();
+
+    const across = moveWorkspace({
+      ...base,
+      key: "a",
+      from: "group:one",
+      to: "group:two",
+      targetKeys: ["c"],
+      overKey: "c",
+    });
+    expect(across.groups).toEqual([group("one", ["b"]), group("two", ["a", "c"])]);
+
+    const out = moveWorkspace({
+      ...base,
+      key: "a",
+      from: "group:one",
+      to: "ungrouped",
+      targetKeys: ["x", "y"],
+      overKey: "y",
+    });
+    expect(out.groups[0]!.projectKeys).toEqual(["b"]);
+    expect(out.workspaceOrder).toEqual(["x", "a", "y"]);
+
+    const pinned = moveWorkspace({
+      ...base,
+      key: "y",
+      from: "ungrouped",
+      to: "pinned",
+      targetKeys: [],
+      overKey: null,
+    });
+    expect(pinned.pinned).toBe(true);
+    expect(pinned.workspaceOrder).toEqual(["y", "x"]);
   });
 
   it("keeps the old name for a blank rename and ungroups on removal", () => {
