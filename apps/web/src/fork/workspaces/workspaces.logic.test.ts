@@ -6,6 +6,9 @@ import type { SidebarProjectSnapshot } from "../../sidebarProjectGrouping";
 import {
   assignWorkspaceToGroup,
   buildWorkspaceSidebarModel,
+  bumpWorkspace,
+  needsYouSnapshot,
+  newlyNeedingYou,
   moveWorkspace,
   moveWorkspaceGroup,
   removeWorkspaceGroup,
@@ -257,5 +260,47 @@ describe("workspace group edits", () => {
     expect(renameWorkspaceGroup(groups, "one", "  ")[0]!.name).toBe("one");
     expect(renameWorkspaceGroup(groups, "one", " Work ")[0]!.name).toBe("Work");
     expect(removeWorkspaceGroup(groups, "one")).toEqual([group("two", ["c"])]);
+  });
+});
+
+describe("workspace bump on unseen activity", () => {
+  it("bumps workspaces whose tab starts waiting on the user, unless it is the tab on screen", () => {
+    const build = (asking: boolean, failing: boolean) =>
+      buildWorkspaceSidebarModel({
+        projects: [project("a"), project("b"), project("c")],
+        threads: [
+          thread("a1", "a", { hasPendingUserInput: asking }),
+          thread("b1", "b", { hasPendingApprovals: failing }),
+          thread("c1", "c", { hasPendingApprovals: true }),
+        ],
+        lastVisitedAtByKey: {},
+        groups: [],
+        now: NOW,
+      });
+    const before = needsYouSnapshot(build(false, false));
+    const after = needsYouSnapshot(build(true, true));
+    expect(newlyNeedingYou(before, after, null)).toEqual(["a", "b"]);
+    expect(newlyNeedingYou(before, after, "local:b1")).toEqual(["a"]);
+    // A tab that already waited (c1) moves nothing.
+    expect(newlyNeedingYou(after, after, null)).toEqual([]);
+    // Threads arriving while the app loads move nothing either.
+    const empty = needsYouSnapshot(
+      buildWorkspaceSidebarModel({ projects: [], threads: [], lastVisitedAtByKey: {}, groups: [] }),
+    );
+    expect(newlyNeedingYou(empty, after, null)).toEqual([]);
+  });
+
+  it("moves to the top of its group or of the ungrouped list, and leaves pinned ones", () => {
+    const groups = [group("one", ["a", "b"])];
+    expect(bumpWorkspace({ groups, workspaceOrder: ["x"], key: "b", pinned: false })).toEqual({
+      groups: [group("one", ["b", "a"])],
+      workspaceOrder: ["x"],
+    });
+    expect(bumpWorkspace({ groups, workspaceOrder: ["x", "y"], key: "y", pinned: false })).toEqual({
+      groups,
+      workspaceOrder: ["y", "x"],
+    });
+    expect(bumpWorkspace({ groups, workspaceOrder: ["y"], key: "y", pinned: false })).toBeNull();
+    expect(bumpWorkspace({ groups, workspaceOrder: [], key: "z", pinned: true })).toBeNull();
   });
 });
