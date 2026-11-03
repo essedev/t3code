@@ -7,3 +7,8 @@
 [data-thread-details-card] {
   --glass-opacity: 96%;
 }
+
+/* No rule under the running turn's "Working for" timer; the work log below already reads as a block. */
+[data-timeline-row-kind="working"] .border-b {
+  border-bottom-width: 0;
+}
