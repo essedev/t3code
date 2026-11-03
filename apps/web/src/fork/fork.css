@@ -8,7 +8,13 @@
   --glass-opacity: 96%;
 }
 
-/* No rule under the running turn's "Working for" timer; the work log below already reads as a block. */
-[data-timeline-row-kind="working"] .border-b {
+/* No rule under a turn's "Working for" or "Worked for" header; the work log reads as a block. */
+[data-timeline-row-kind="working"] > .border-b,
+[data-timeline-row-kind="turn-fold"] > .border-b {
   border-bottom-width: 0;
+}
+
+/* No side rules on chat system notes ("Run interrupted"); the centered label stands on its own. */
+[data-timeline-row-id] span.h-px.flex-1[aria-hidden="true"] {
+  visibility: hidden;
 }
