@@ -7,7 +7,10 @@ one `fork` key (`packages/contracts/src/forkSettings.ts`), saved in the environm
 - **Workspace sidebar**: switches between upstream's sidebar and the workspace sidebar with the
   thread tab strip. See [`workspace-sidebar.md`](workspace-sidebar.md).
 - **Custom CSS**: CSS applied on top of the app's styles in every client, live while you type
-  (the editor previews right away and saves after a short pause or on blur).
+  (the editor previews right away and saves after a short pause or on blur). Above the editor,
+  the fork defaults (`fork.css`, read only) are listed rule by rule; "Copy to my CSS" puts a rule
+  at the top of the editor, so the rules already there still win, and it reads "In your CSS"
+  once the editor holds it.
 
 ## Style layers
 
@@ -17,8 +20,10 @@ one `fork` key (`packages/contracts/src/forkSettings.ts`), saved in the environm
    Appearance > Glass opacity) and drops the rule under the running turn's "Working for" timer.
 3. The Custom CSS field, injected last by `ForkStyles` (`apps/web/src/fork/ForkStyles.tsx`).
 
-A rule that proves itself in the field moves into `fork.css` with a commit, so it ships with the
-build instead of living only in one machine's settings.
+The two layers stay separate on purpose: a saved editor never changes, so defaults kept in it
+would stop arriving with releases, and a copy of a rule whose selector a release renames would
+break silently. A rule that proves itself in the editor moves into `fork.css` with a commit, so it
+ships with the build instead of living only in one machine's settings.
 
 ## Useful hooks
 
