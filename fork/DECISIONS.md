@@ -85,3 +85,14 @@ changes only to mount them, a few lines each, listed in the README's differences
 files cannot conflict on a rebase, so `release.sh` checks only that they carry "fork" in their
 path. Rejected: editing upstream components in place (the workspace sidebar inside `Sidebar.tsx`,
 3,600 lines that move every release), which would turn each rebase into a manual merge.
+
+## 9. Default CSS ships in `fork.css`, the Custom CSS field holds only the user's rules
+
+Status: active (2026-11-03)
+
+Fork style defaults live in `apps/web/src/fork/fork.css` and ship with the build; Settings > Fork
+lists them read only, and "Copy to my CSS" puts a rule at the top of the editor so the user's own
+rules still win. Rejected: seeding the defaults into the Custom CSS field, because a saved field
+never changes, so new defaults would stop arriving with releases and a copied rule whose selector
+upstream renames would break silently. A rule that proves itself in the editor moves into
+`fork.css` with a commit. Detail: `features/fork-settings.md`.
