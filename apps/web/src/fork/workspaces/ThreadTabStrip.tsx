@@ -60,6 +60,7 @@ import {
   reorderTabs,
   stepThrough,
   tabAfterClosing,
+  workspaceAfterClosing,
   type WorkspaceTab,
 } from "./workspaces.logic";
 
@@ -93,7 +94,7 @@ function ThreadTabStripContent(props: {
   readonly isServerThread: boolean;
 }) {
   const model = useWorkspaceSidebarModel();
-  const { openThread, newThreadIn } = useWorkspaceNavigation();
+  const { openThread, newThreadIn, openWorkspace } = useWorkspaceNavigation();
   const { settleThread } = useThreadActions();
   const { saveTabOrder } = useWorkspaceLayoutEditor();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
@@ -139,9 +140,14 @@ function ThreadTabStripContent(props: {
       leaving.current = { key, next: tabAfterClosing(openTabs, key), at: nowMs() };
     }
   };
+  // The last tab closing closes the workspace too, as in Relay: on to the next one in the
+  // sidebar. A pinned workspace stays listed, so it gets a new thread instead.
   const leaveTo = (next: WorkspaceTab | null) => {
-    if (next) openThread(next.thread);
-    else if (workspace) newThreadIn(workspace.project);
+    if (next) return openThread(next.thread);
+    if (!workspace) return;
+    const following = workspace.project.pinned ? null : workspaceAfterClosing(model, workspace.key);
+    if (following) openWorkspace(following);
+    else newThreadIn(workspace.project);
   };
   const peekKey = peekTab?.key ?? null;
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- navigates once the closed tab's thread has actually left the strip, which the server confirms asynchronously

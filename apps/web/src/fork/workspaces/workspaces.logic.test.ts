@@ -15,6 +15,7 @@ import {
   renameWorkspaceGroup,
   reorderTabs,
   tabAfterClosing,
+  workspaceAfterClosing,
 } from "./workspaces.logic";
 
 const NOW = "2026-11-02T16:20:00.000Z";
@@ -185,6 +186,9 @@ describe("buildWorkspaceSidebarModel", () => {
       ["new", []],
     ]);
     expect(model.ungrouped.map((workspace) => workspace.key)).toEqual(["current", "b"]);
+    // Closing the last tab moves on to the next listed workspace, else the previous one.
+    expect(workspaceAfterClosing(model, "a")?.key).toBe("current");
+    expect(workspaceAfterClosing(model, "b")?.key).toBe("current");
     expect(
       model.workspaces.filter((ws) => !listedKeys(model).includes(ws.key)).map((ws) => ws.key),
     ).toEqual(["quiet", "idle"]);
