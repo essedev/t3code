@@ -40,7 +40,9 @@ unchanged. Design and rejected variants: DECISIONS #7 and
   in the dragged order, else creation order. Each tab has its status icon; hover shows Snooze and
   Settle; right click opens upstream's full thread menu; double click renames; middle click
   settles. Settling or snoozing the tab on screen, from any control, the menu or `Cmd+Shift+S`,
-  opens the tab to its right (else its left, else a new thread) once the server confirms; an
+  opens the tab to its right (else its left) once the server confirms. Closing the last tab closes
+  the workspace too, as in Relay: the next workspace in the sidebar opens (a pinned workspace
+  stays and gets a new thread instead); an
   auto-settle never moves you. A snoozed or settled thread opened from a list shows as an extra
   tab until you leave it. The `+N` button lists the
   workspace's snoozed and settled threads; the pen starts a new thread in the workspace.
