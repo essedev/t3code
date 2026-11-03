@@ -415,6 +415,21 @@ export function tabAfterClosing(tabs: readonly WorkspaceTab[], key: string): Wor
   return tabs[index + 1] ?? tabs[index - 1] ?? null;
 }
 
+/**
+ * Where to go when the last open tab of workspace `key` closes: the next listed workspace in the
+ * sidebar's order, else the previous one, else none (the caller stays in the workspace).
+ */
+export function workspaceAfterClosing(model: WorkspaceSidebarModel, key: string): Workspace | null {
+  const listed = [
+    ...model.pinned,
+    ...model.groups.flatMap((view) => view.workspaces),
+    ...model.ungrouped,
+  ];
+  const index = listed.findIndex((workspace) => workspace.key === key);
+  if (index === -1) return listed[0] ?? null;
+  return listed[index + 1] ?? listed[index - 1] ?? null;
+}
+
 /** The result of dragging a workspace: what to save, and the pin to set when it changes. */
 export interface WorkspaceMove {
   readonly groups: ForkWorkspaceGroup[];
