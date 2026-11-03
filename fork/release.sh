@@ -131,7 +131,9 @@ trap 'rm -rf "$check"' EXIT
 ditto -x -k "$zip" "$check"
 app="$(ls -d "$check"/*.app)"
 codesign --verify --deep --strict "$app" || fail "the app signature does not verify"
-codesign -dvv "$app" 2>&1 | grep -q "Authority=$IDENTITY" || fail "the app is not signed by '$IDENTITY'"
+# Read the whole output first: grep -q exits early, and under pipefail codesign's SIGPIPE fails it.
+signature="$(codesign -dvv "$app" 2>&1)"
+grep -q "Authority=$IDENTITY" <<<"$signature" || fail "the app is not signed by '$IDENTITY'"
 grep -q "repo: t3code" "$app/Contents/Resources/app-update.yml" &&
   grep -q "owner: essedev" "$app/Contents/Resources/app-update.yml" ||
   fail "the update feed does not point at $REPO_SLUG"
