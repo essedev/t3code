@@ -14,7 +14,7 @@ one `fork` key (`packages/contracts/src/forkSettings.ts`), saved in the environm
 1. The app's own styles.
 2. `apps/web/src/fork/fork.css`, the fork's defaults, versioned in the repo. Today it raises the
    thread details card to `--glass-opacity: 96%` (the app-wide default is 80%, set by Settings >
-   Appearance > Glass opacity).
+   Appearance > Glass opacity) and drops the rule under the running turn's "Working for" timer.
 3. The Custom CSS field, injected last by `ForkStyles` (`apps/web/src/fork/ForkStyles.tsx`).
 
 A rule that proves itself in the field moves into `fork.css` with a commit, so it ships with the
@@ -25,6 +25,7 @@ build instead of living only in one machine's settings.
 - `[data-thread-details-card]`: the details card at the top right of a thread.
 - `[data-thread-tab-strip]`: the tab strip of the workspace sidebar.
 - `[data-app-sidebar]`: the left sidebar.
+- `[data-timeline-row-kind="..."]`: a chat timeline row by kind (`working`, `message`, ...).
 
 ## Recovery
 
