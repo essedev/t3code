@@ -72,3 +72,14 @@ Built in new files that import upstream's status and action logic. Concept:
 `concepts/concept-a-sidebar-workspace.html`. Rejected: an inbox shelf of tabs on top (A, pushes
 workspaces below the fold) and status sections of workspaces (B, rows move under the cursor and
 groups split).
+
+## 8. Fork code lives in new files marked "fork", upstream files only get mount points
+
+Status: active (2026-11-03)
+
+Fork features are new files with "fork" in their path (`apps/web/src/fork/`,
+`packages/contracts/src/forkSettings.ts`, `routes/_chat.settings.fork.tsx`). An upstream file
+changes only to mount them, a few lines each, listed in the README's differences table. Added
+files cannot conflict on a rebase, so `release.sh` checks only that they carry "fork" in their
+path. Rejected: editing upstream components in place (the workspace sidebar inside `Sidebar.tsx`,
+3,600 lines that move every release), which would turn each rebase into a manual merge.
