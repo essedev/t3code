@@ -50,17 +50,19 @@ function CustomCssRow() {
   const updateForkSettings = useUpdateForkSettings();
   const [draft, setDraft] = useState<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingSave = useRef<(() => void) | null>(null);
 
   const save = (css: string) => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = null;
+    pendingSave.current = null;
     if (css !== customCss) updateForkSettings({ customCss: css });
   };
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- saves a pending edit and drops the live preview when the page closes
   useEffect(
     () => () => {
-      if (saveTimer.current) clearTimeout(saveTimer.current);
+      pendingSave.current?.();
       setCustomCssDraft(null);
     },
     [],
@@ -96,6 +98,7 @@ function CustomCssRow() {
             setDraft(css);
             setCustomCssDraft(css);
             if (saveTimer.current) clearTimeout(saveTimer.current);
+            pendingSave.current = () => save(css);
             saveTimer.current = setTimeout(() => save(css), CUSTOM_CSS_SAVE_DELAY_MS);
           }}
           onBlur={() => {
