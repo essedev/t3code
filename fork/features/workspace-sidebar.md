@@ -33,9 +33,13 @@ unchanged. Design and rejected variants: DECISIONS #7 and
   (`fork.workspaceOrder`, and `fork.tabOrder` per workspace); a tab the order does not name yet
   goes to the end.
 - **Global rows** at the bottom: Needs you (approvals, questions, guest requests, plans, failures
-  and results not seen yet), Snoozed (with wake time and Wake) and Settled (newest 10, Show all,
-  Un-settle), across every workspace. A row opens its thread. Settled holds only the settled
-  threads the server sends at start, the 25 most recent (see Limits).
+  and results not seen yet), Snoozed and Settled, across every workspace. Each opens a list built
+  on the command palette's parts: a search field (title or workspace, accents ignored), arrows and
+  Enter to open a thread, Wake or Un-settle on the highlighted row. Settled shows the true count and
+  pages older threads in 25 at a time with Show more, as upstream's Settled shelf does, since the
+  server's shell stream keeps only the 25 most recently settled; its search goes through the
+  server's thread search, so it finds settled threads not loaded yet, by title or message text.
+  The strip's `+N` uses the same list for the workspace's snoozed and settled threads.
 - **Tab strip** under the chat header: the workspace's open threads, pinned first, then the rest
   in the dragged order, else creation order. Each tab has its status icon; hover shows Snooze and
   Settle; right click opens upstream's full thread menu; double click renames; middle click
@@ -75,7 +79,9 @@ New files only, in `apps/web/src/fork/workspaces/`, importing upstream's logic:
 - `useWorkspaces.ts`: live data (`useSidebarProjectGroups`, `useQuietThreadShells`), navigation
   and layout edits. Fork settings show an edit right away (`forkSettings.ts`), since upstream's
   settings save is not optimistic and a dropped row would otherwise jump back for a moment.
-- `WorkspaceSidebar.tsx`, `ThreadTabStrip.tsx`, `WorkspaceParts.tsx`: the UI. Thread actions go
+- `WorkspaceSidebar.tsx`, `ThreadTabStrip.tsx`, `GlobalRows.tsx`, `TabPicker.tsx`,
+  `WorkspaceParts.tsx`: the UI. Settled reuses upstream's `useOlderSettledShelf` and
+  `useThreadSearch`. Thread actions go
   through `useThreadActions` and `useThreadActionMenu`, like upstream's rows.
 
 Upstream files touched: two mount points (`AppSidebarLayout.tsx`, `ChatView.tsx`), listed in the
@@ -90,10 +96,6 @@ README's differences table.
 
 ## Limits
 
-- Settled lists only the settled threads the client holds: the server's shell stream keeps the 25
-  most recently settled (`NEWEST_SETTLED_KEPT` in `apps/server/src/orchestration-v2/ShellStream.ts`),
-  and the count shows the same. Upstream's sidebar pages older ones in as its shelf scrolls; the
-  fork does not yet, and `Cmd+K` still finds them.
 - Upstream's sidebar search is not there; the Go to project or thread field opens the command
   palette (Cmd+K), which searches projects and threads.
 - Mobile keeps its own thread-centred navigation.

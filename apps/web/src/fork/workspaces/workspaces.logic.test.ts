@@ -14,6 +14,7 @@ import {
   removeWorkspaceGroup,
   renameWorkspaceGroup,
   reorderTabs,
+  searchTabs,
   tabAfterClosing,
   workspaceAfterClosing,
 } from "./workspaces.logic";
@@ -306,5 +307,33 @@ describe("workspace bump on unseen activity", () => {
     });
     expect(bumpWorkspace({ groups, workspaceOrder: ["y"], key: "y", pinned: false })).toBeNull();
     expect(bumpWorkspace({ groups, workspaceOrder: [], key: "z", pinned: true })).toBeNull();
+  });
+});
+
+describe("searchTabs", () => {
+  it("matches titles and workspace names ignoring case and accents, then server matches", () => {
+    const tabs = buildWorkspaceSidebarModel({
+      projects: [project("relay"), project("città")],
+      threads: [
+        thread("Sidebar polish", "relay"),
+        thread("Release notes", "relay"),
+        thread("Mappa", "città"),
+      ],
+      lastVisitedAtByKey: {},
+      groups: [],
+      now: NOW,
+    }).workspaces.flatMap((workspace) => workspace.openTabs);
+    const nameOf = (tab: (typeof tabs)[number]) => String(tab.thread.projectId);
+    const ids = (found: typeof tabs) => found.map((tab) => tab.thread.id);
+    expect(ids(searchTabs(tabs, "  ", nameOf))).toEqual([
+      "Sidebar polish",
+      "Release notes",
+      "Mappa",
+    ]);
+    expect(ids(searchTabs(tabs, "SIDE", nameOf))).toEqual(["Sidebar polish"]);
+    expect(ids(searchTabs(tabs, "citta", nameOf))).toEqual(["Mappa"]);
+    expect(ids(searchTabs(tabs, "budget", nameOf, new Set(["local:Release notes"])))).toEqual([
+      "Release notes",
+    ]);
   });
 });
