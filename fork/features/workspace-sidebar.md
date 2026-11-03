@@ -32,7 +32,9 @@ unchanged. Design and rejected variants: DECISIONS #7 and
   Un-settle), across every workspace. A row opens its thread.
 - **Tab strip** under the chat header: the workspace's open threads, pinned first, then the rest
   in the dragged order, else creation order. Each tab has its status icon; hover shows Snooze and Settle; right click
-  opens upstream's full thread menu; double click renames; middle click settles. A snoozed or
+  opens upstream's full thread menu; double click renames; middle click settles. Settling or snoozing the tab
+  on screen, from any of these or the menu, opens the tab to its right (else its left, else a new
+  thread), once the server confirms; an auto-settle never moves you. A snoozed or
   settled thread opened from a list shows as an extra tab. The `+N` button lists the
   workspace's snoozed and settled threads; the pen starts a new thread in the workspace.
 - **Status icons**: upstream's sidebar icons and colours (Working, Waiting, Approval, Input,

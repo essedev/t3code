@@ -408,6 +408,13 @@ export function reorderTabs(
   return arrayMove(tabs, from, to).map((tab) => tab.key);
 }
 
+/** The tab to show after closing `key`: the one to its right, else to its left, else none. */
+export function tabAfterClosing(tabs: readonly WorkspaceTab[], key: string): WorkspaceTab | null {
+  const index = tabs.findIndex((tab) => tab.key === key);
+  if (index === -1) return null;
+  return tabs[index + 1] ?? tabs[index - 1] ?? null;
+}
+
 /** The result of dragging a workspace: what to save, and the pin to set when it changes. */
 export interface WorkspaceMove {
   readonly groups: ForkWorkspaceGroup[];

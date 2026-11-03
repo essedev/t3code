@@ -55,9 +55,21 @@ import {
   useWorkspaceNavigation,
   useWorkspaceSidebarModel,
 } from "./useWorkspaces";
-import { findWorkspaceKey, reorderTabs, stepThrough, type WorkspaceTab } from "./workspaces.logic";
+import {
+  findWorkspaceKey,
+  reorderTabs,
+  stepThrough,
+  tabAfterClosing,
+  type WorkspaceTab,
+} from "./workspaces.logic";
 
 const TAB_DRAG_MODIFIERS = [restrictToHorizontalAxis, restrictToFirstScrollableAncestor];
+const LEAVE_INTENT_TTL_MS = 10_000;
+
+// Read only from handlers and effects; the purity lint cannot tell those from render.
+function nowMs(): number {
+  return Date.now();
+}
 
 /**
  * The open threads of the current workspace as tabs, under the chat header. Renders nothing
@@ -115,17 +127,46 @@ function ThreadTabStripContent(props: {
   );
   const optionLabel = isMacPlatform(navigator.platform) ? "\u2325" : "Alt+";
 
+  // Closing the shown tab moves to its neighbour like a browser, once the thread has left the
+  // strip: a failed action stays put, and an auto-settle nobody asked for never moves the user.
+  const leaving = useRef<{
+    readonly key: string;
+    readonly next: WorkspaceTab | null;
+    readonly at: number;
+  } | null>(null);
+  const expectLeave = (key: string) => {
+    if (key === activeKey) {
+      leaving.current = { key, next: tabAfterClosing(openTabs, key), at: nowMs() };
+    }
+  };
+  const leaveTo = (next: WorkspaceTab | null) => {
+    if (next) openThread(next.thread);
+    else if (workspace) newThreadIn(workspace.project);
+  };
+  const peekKey = peekTab?.key ?? null;
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- navigates once the closed tab's thread has actually left the strip, which the server confirms asynchronously
+  useEffect(() => {
+    const intent = leaving.current;
+    if (intent === null) return;
+    if (intent.key !== activeKey || nowMs() - intent.at > LEAVE_INTENT_TTL_MS) {
+      leaving.current = null;
+      return;
+    }
+    if (peekKey !== intent.key) return;
+    leaving.current = null;
+    leaveTo(intent.next);
+  });
+
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- registers the settle-and-advance handler the composer and shortcuts call, with the current tab order
   useEffect(
     () =>
       registerSettleAndAdvance((threadRef) => {
         const key = scopedThreadKey(threadRef);
-        const index = tabs.findIndex((tab) => tab.key === key);
-        const next = index === -1 ? null : (tabs[index + 1] ?? tabs[index - 1] ?? null);
+        const known = tabs.some((tab) => tab.key === key);
         void reportThreadAction("Failed to settle thread", () => settleThread(threadRef));
-        if (next) openThread(next.thread);
+        if (known) leaveTo(tabAfterClosing(openTabs, key));
       }),
-    [tabs, settleThread, openThread],
+    [tabs, openTabs, settleThread, leaveTo],
   );
 
   if (workspace === null) return null;
@@ -162,6 +203,7 @@ function ThreadTabStripContent(props: {
                 active={tab.key === activeKey}
                 sortable={tab !== peekTab}
                 onOpen={() => openThread(tab.thread)}
+                onWillClose={() => expectLeave(tab.key)}
               />
             ))}
           </SortableContext>
@@ -270,6 +312,8 @@ function ThreadTab(props: {
   /** The `Option+N` label shown while Option is held. */
   readonly shortcutHint: string | null;
   readonly onOpen: () => void;
+  /** Called before an action that may take the tab out of the strip. */
+  readonly onWillClose: () => void;
 }) {
   const { tab, active } = props;
   const thread = tab.thread;
@@ -333,6 +377,7 @@ function ThreadTab(props: {
         ? await requestCustomSnooze()
         : pickSnoozePreset(presets, clicked.value, timestampFormat, thread.environmentId);
     if (!preset) return;
+    props.onWillClose();
     await reportThreadAction("Failed to snooze thread", () =>
       snoozeThread(threadRef, preset.snoozedUntil),
     );
@@ -359,6 +404,7 @@ function ThreadTab(props: {
         // Middle click settles, like closing a browser tab.
         if (event.button !== 1 || !canOperate) return;
         event.preventDefault();
+        props.onWillClose();
         void reportThreadAction("Failed to settle thread", () => settleThread(threadRef));
       }}
       onKeyDown={(event) => {
@@ -366,6 +412,7 @@ function ThreadTab(props: {
       }}
       onContextMenu={(event) => {
         event.preventDefault();
+        props.onWillClose();
         openMenu({ x: event.clientX, y: event.clientY });
       }}
       className={cn(
@@ -420,9 +467,10 @@ function ThreadTab(props: {
           ) : null}
           <StripIconButton
             label="Settle"
-            onClick={() =>
-              void reportThreadAction("Failed to settle thread", () => settleThread(threadRef))
-            }
+            onClick={() => {
+              props.onWillClose();
+              void reportThreadAction("Failed to settle thread", () => settleThread(threadRef));
+            }}
           >
             <CheckIcon />
           </StripIconButton>
