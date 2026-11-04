@@ -266,6 +266,7 @@ it.layer(layerTest)("ProjectFaviconResolverLive", (it) => {
             files: ["site/index.html", "site/public/brand/logo.svg"],
             expected: "site/public/brand/logo.svg",
           },
+          { files: ["bundle/AppIcon.icns"], expected: "bundle/AppIcon.icns" },
           { files: ["node_modules/pkg/public/favicon.svg"], expected: null },
           { files: ["a/b/c/public/favicon.svg"], expected: null },
         ];
