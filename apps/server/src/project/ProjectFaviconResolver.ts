@@ -71,7 +71,7 @@ const ICON_SOURCE_FILES = [
   "src/index.html",
 ] as const;
 
-// Monorepos keep the web app's icon in a subfolder (frontend/public, apps/web/public). The walk is
+// Monorepos keep the app's icon in a subfolder (frontend/public, apps/web/public, bundle). The walk is
 // bounded so a large repository stays cheap; it runs only when the root has no icon.
 const NESTED_APP_MAX_DEPTH = 2;
 const NESTED_APP_MAX_DIRECTORIES = 50;
@@ -91,6 +91,8 @@ const NESTED_APP_ICON_CANDIDATES = [
   "public/favicon.svg",
   "public/favicon.png",
   "public/favicon.ico",
+  "AppIcon.icns",
+  "Resources/AppIcon.icns",
 ] as const;
 
 // Anchor HTML at <link and scan brace-free metadata runs to avoid quadratic regex rescans.
