@@ -139,7 +139,8 @@ grep -q "repo: t3code" "$app/Contents/Resources/app-update.yml" &&
   fail "the update feed does not point at $REPO_SLUG"
 
 git tag -a "$tag" -m "T3 Code fork $version"
-git push origin "$BRANCH" "$tag"
+# Rebasing on a new upstream base rewrites the branch, so a plain push is rejected.
+git push --force-with-lease origin "$BRANCH" "$tag"
 gh release create "$tag" --repo "$REPO_SLUG" --latest \
   --title "T3 Code fork $version" \
   --notes "Fork release on top of upstream $base_tag.
