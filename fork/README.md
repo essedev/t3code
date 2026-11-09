@@ -27,10 +27,8 @@ file lacks "fork" in its path.
 - `apps/desktop/src/boot.ts`: telemetry and OpenTelemetry export off by default (DECISIONS #5).
 - `apps/server/src/process/externalLauncher.ts`: mounts `forkSystemBrowser.ts` for the
   `systemBrowser` launch.
-- `apps/server/src/project/ProjectFaviconResolver.ts`: when the root has no icon, a bounded search
-  of subfolders finds a monorepo app's favicon (`frontend/public`, `apps/web/public`) or a macOS
-  app's `AppIcon.icns` (`bundle/`).
-- `apps/server/src/project/ProjectFaviconResolver.test.ts`: the monorepo layouts it covers.
+- `apps/server/src/project/ProjectFaviconResolver.ts`: when the root has no icon, tries the subfolders
+  `forkProjectFavicon.ts` finds; its lookups gain a base directory.
 - `apps/web/src/components/AppSidebarLayout.tsx`: mounts the workspace sidebar when it is on.
 - `apps/web/src/components/ChatMarkdown.tsx`: "Open in system browser" on chat file links.
 - `apps/web/src/components/ChatView.tsx`: mounts the thread tab strip under the chat header.

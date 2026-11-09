@@ -12,6 +12,7 @@ import * as PlatformError from "effect/PlatformError";
 import * as Schema from "effect/Schema";
 
 import * as WorkspacePaths from "../workspace/WorkspacePaths.ts";
+import { makeNestedAppSearch } from "./forkProjectFavicon.ts";
 import * as T3ProjectFileLoader from "./T3ProjectFileLoader.ts";
 
 const FAVICON_CACHE_CAPACITY = 512;
@@ -69,30 +70,6 @@ const ICON_SOURCE_FILES = [
   "app/root.tsx",
   "src/root.tsx",
   "src/index.html",
-] as const;
-
-// Monorepos keep the app's icon in a subfolder (frontend/public, apps/web/public, bundle). The walk is
-// bounded so a large repository stays cheap; it runs only when the root has no icon.
-const NESTED_APP_MAX_DEPTH = 2;
-const NESTED_APP_MAX_DIRECTORIES = 50;
-const NESTED_APP_PREFERRED_NAMES = ["frontend", "web", "client", "app"] as const;
-const NESTED_APP_SKIPPED_NAMES = new Set([
-  "node_modules",
-  "dist",
-  "build",
-  "out",
-  "target",
-  "vendor",
-  "coverage",
-  "venv",
-  "__pycache__",
-]);
-const NESTED_APP_ICON_CANDIDATES = [
-  "public/favicon.svg",
-  "public/favicon.png",
-  "public/favicon.ico",
-  "AppIcon.icns",
-  "Resources/AppIcon.icns",
 ] as const;
 
 // Anchor HTML at <link and scan brace-free metadata runs to avoid quadratic regex rescans.
@@ -161,20 +138,12 @@ export const optionOnNotFound = <A, R>(
     }),
   );
 
-const nestedAppRank = (name: string): number => {
-  const rank = (NESTED_APP_PREFERRED_NAMES as ReadonlyArray<string>).indexOf(name);
-  return rank === -1 ? NESTED_APP_PREFERRED_NAMES.length : rank;
-};
-
-// Names with a dot are hidden folders or files with an extension; skipping them avoids a stat per file.
-const isNestedAppCandidateName = (name: string): boolean =>
-  !name.includes(".") && !NESTED_APP_SKIPPED_NAMES.has(name);
-
 export const make = Effect.gen(function* () {
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const workspacePaths = yield* WorkspacePaths.WorkspacePaths;
   const projectFileLoader = yield* T3ProjectFileLoader.T3ProjectFileLoader;
+  const nestedApps = yield* makeNestedAppSearch;
 
   const resolveIconHref = (href: string, baseDir: string): ReadonlyArray<string> => {
     const clean = href.replace(/^\//, "");
@@ -268,80 +237,13 @@ export const make = Effect.gen(function* () {
     return yield* findExistingFile(projectCwd, resolveIconHref(href, baseDir), "workspace");
   });
 
-  const listChildDirectories = Effect.fn("ProjectFaviconResolver.listChildDirectories")(function* (
-    projectCwd: string,
-    relativeDir: string,
-  ): Effect.fn.Return<ReadonlyArray<string>, ProjectFaviconResolutionError> {
-    const toResolutionError = (cause: PlatformError.PlatformError) =>
-      new ProjectFaviconResolutionError({
-        operation: "read-directory",
-        workspaceRoot: projectCwd,
-        relativePath: relativeDir,
-        cause,
-      });
-    const unreadable = (error: PlatformError.PlatformError) =>
-      error.reason._tag === "NotFound" || error.reason._tag === "PermissionDenied";
-
-    const names = yield* fileSystem.readDirectory(path.join(projectCwd, relativeDir)).pipe(
-      Effect.catchTags({
-        PlatformError: (error) =>
-          unreadable(error) ? Effect.succeed<Array<string>>([]) : Effect.fail(error),
-      }),
-      Effect.mapError(toResolutionError),
-    );
-    const candidates = names
-      .filter(isNestedAppCandidateName)
-      .map((name) => path.join(relativeDir, name));
-    const directories = yield* Effect.forEach(
-      candidates,
-      (candidate) =>
-        fileSystem.stat(path.join(projectCwd, candidate)).pipe(
-          Effect.map((info) => (info.type === "Directory" ? candidate : null)),
-          Effect.catchTags({
-            PlatformError: (error) =>
-              unreadable(error) ? Effect.succeed(null) : Effect.fail(error),
-          }),
-          Effect.mapError(toResolutionError),
-        ),
-      { concurrency: 16 },
-    );
-    return directories.filter((directory) => directory !== null);
-  });
-
-  const listNestedAppDirectories = Effect.fn("ProjectFaviconResolver.listNestedAppDirectories")(
-    function* (
-      projectCwd: string,
-    ): Effect.fn.Return<ReadonlyArray<string>, ProjectFaviconResolutionError> {
-      const found: Array<string> = [];
-      let level: ReadonlyArray<string> = [""];
-      for (let depth = 0; depth < NESTED_APP_MAX_DEPTH && level.length > 0; depth++) {
-        const children = (yield* Effect.forEach(
-          level,
-          (dir) => listChildDirectories(projectCwd, dir),
-          {
-            concurrency: 8,
-          },
-        ))
-          .flat()
-          .toSorted(
-            (a, b) =>
-              nestedAppRank(path.basename(a)) - nestedAppRank(path.basename(b)) ||
-              a.localeCompare(b),
-          );
-        level = children.slice(0, NESTED_APP_MAX_DIRECTORIES - found.length);
-        found.push(...level);
-      }
-      return found;
-    },
-  );
-
   const findNestedAppIcon = Effect.fn("ProjectFaviconResolver.findNestedAppIcon")(function* (
     projectCwd: string,
     appDir: string,
   ): Effect.fn.Return<string | null, ProjectFaviconResolutionError> {
     const wellKnown = yield* findExistingFile(
       projectCwd,
-      NESTED_APP_ICON_CANDIDATES.map((candidate) => path.join(appDir, candidate)),
+      nestedApps.iconCandidates(appDir),
       "workspace",
     );
     return (
@@ -412,7 +314,16 @@ export const make = Effect.gen(function* () {
       return fromSource;
     }
 
-    const nestedAppDirectories = yield* listNestedAppDirectories(projectCwd);
+    const nestedAppDirectories = yield* nestedApps.listDirectories(projectCwd).pipe(
+      Effect.mapError(
+        (cause) =>
+          new ProjectFaviconResolutionError({
+            operation: "read-directory",
+            workspaceRoot: projectCwd,
+            cause,
+          }),
+      ),
+    );
     return yield* firstInOrder(nestedAppDirectories, (appDir) =>
       findNestedAppIcon(projectCwd, appDir),
     );
