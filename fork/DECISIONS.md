@@ -9,8 +9,8 @@ Status: active (2026-11-02)
 
 Scripts, docs and decisions that exist only because of the fork go in `fork/`; the only upstream
 file touched for them is the `@fork/README.md` line in `CLAUDE.md`. Changes to the app itself go
-where upstream keeps that code. Rejected: fork material in `scripts/` and `docs/`, which would make
-every rebase on a new upstream release conflict.
+in the app's packages, as #8 describes. Rejected: fork material in `scripts/` and `docs/`, which
+would make every rebase on a new upstream release conflict.
 
 ## 2. The fork follows upstream stable tags
 
