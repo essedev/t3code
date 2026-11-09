@@ -33,6 +33,7 @@ import * as ChildProcess from "effect/process/ChildProcess";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 
 import { makeStaleWhileRevalidate } from "../environment/staleWhileRevalidate.ts";
+import { resolveSystemBrowserLaunch } from "./forkSystemBrowser.ts";
 export {
   ExternalLauncherError,
   ExternalLauncherBrowserSpawnError,
@@ -502,6 +503,10 @@ const resolveEditorLaunch = Effect.fn("resolveEditorLaunch")(function* (
 
   if (input.reveal === true) {
     return yield* resolveFileManagerRevealLaunch(input.cwd, platform, env, command);
+  }
+
+  if (input.systemBrowser === true) {
+    return yield* resolveSystemBrowserLaunch(input.cwd, platform);
   }
 
   return {

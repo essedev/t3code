@@ -5,7 +5,9 @@ import {
   type EnvironmentId,
 } from "@t3tools/contracts";
 
+import { isBrowserPreviewFile } from "./browser/openFileInPreview";
 import { resolveDiffPathForWorkspace } from "./diffFileActions";
+import { OPEN_IN_SYSTEM_BROWSER_LABEL, useSystemBrowser } from "./fork/systemBrowser";
 import {
   revealInFileExplorerLabelForKind,
   revealInFileExplorerLabelForOs,
@@ -21,6 +23,7 @@ import { useAtomValue } from "@effect/atom-react";
 export type FileContextMenuAction =
   | "reveal-in-folder"
   | "open"
+  | "open-in-system-browser"
   /** Submenu parent; never the activated id. */
   | "open-with"
   | `editor:${EditorId}`;
@@ -58,12 +61,16 @@ export interface FileContextMenuCapabilities {
 
 function buildFileContextMenuItems(input: {
   readonly hasAbsolutePath: boolean;
+  readonly canOpenInSystemBrowser: boolean;
   readonly capabilities: FileContextMenuCapabilities;
 }): readonly ContextMenuItem<FileContextMenuAction>[] {
   if (!input.hasAbsolutePath) return [];
   const items: ContextMenuItem<FileContextMenuAction>[] = [];
   if (input.capabilities.canOpenDefault) {
     items.push({ id: "open", label: "Open", icon: "pencil" });
+  }
+  if (input.canOpenInSystemBrowser) {
+    items.push({ id: "open-in-system-browser", label: OPEN_IN_SYSTEM_BROWSER_LABEL });
   }
   if (input.capabilities.revealLabel !== undefined) {
     items.push({
@@ -89,6 +96,7 @@ function buildFileContextMenuItems(input: {
 export function useFileContextMenu(environmentId: EnvironmentId | null) {
   const openInEditor = useAtomCommand(shellEnvironment.openInEditor, { reportFailure: false });
   const serverConfig = useAtomValue(serverEnvironment.configValueAtom(environmentId));
+  const systemBrowser = useSystemBrowser(environmentId);
 
   const availableEditors = serverConfig?.availableEditors ?? [];
   const capabilities: FileContextMenuCapabilities = {
@@ -111,6 +119,10 @@ export function useFileContextMenu(environmentId: EnvironmentId | null) {
   ): Promise<void> => {
     const absolutePath = resolveFileContextMenuAbsolutePath(target);
     if (absolutePath === null || environmentId === null) return;
+    if (action === "open-in-system-browser") {
+      await systemBrowser.open(() => absolutePath);
+      return;
+    }
 
     const reveal = action === "reveal-in-folder";
     const editor =
@@ -143,6 +155,7 @@ export function useFileContextMenu(environmentId: EnvironmentId | null) {
     const api = readLocalApi();
     const items = buildFileContextMenuItems({
       hasAbsolutePath: resolveFileContextMenuAbsolutePath(target) !== null,
+      canOpenInSystemBrowser: systemBrowser.available && isBrowserPreviewFile(target.filePath),
       capabilities,
     });
     if (items.length === 0 || api === undefined) return;
@@ -155,6 +168,7 @@ export function useFileContextMenu(environmentId: EnvironmentId | null) {
     buildItems: (target: FileContextMenuTarget) =>
       buildFileContextMenuItems({
         hasAbsolutePath: resolveFileContextMenuAbsolutePath(target) !== null,
+        canOpenInSystemBrowser: systemBrowser.available && isBrowserPreviewFile(target.filePath),
         capabilities,
       }),
     capabilities,

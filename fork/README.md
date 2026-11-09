@@ -24,17 +24,23 @@ fork adds need no row: they cannot conflict, and they carry "fork" in their path
 file lacks "fork" in its path.
 
 - `apps/desktop/src/boot.ts`: telemetry and OpenTelemetry export off by default (DECISIONS #5).
+- `apps/server/src/process/externalLauncher.ts`: mounts `forkSystemBrowser.ts` for the
+  `systemBrowser` launch.
 - `apps/server/src/project/ProjectFaviconResolver.ts`: when the root has no icon, a bounded search
   of subfolders finds a monorepo app's favicon (`frontend/public`, `apps/web/public`) or a macOS
   app's `AppIcon.icns` (`bundle/`).
 - `apps/server/src/project/ProjectFaviconResolver.test.ts`: the monorepo layouts it covers.
 - `apps/web/src/components/AppSidebarLayout.tsx`: mounts the workspace sidebar when it is on.
+- `apps/web/src/components/ChatMarkdown.tsx`: "Open in system browser" on chat file links.
 - `apps/web/src/components/ChatView.tsx`: mounts the thread tab strip under the chat header.
+- `apps/web/src/components/chat/MarkdownFileLink.tsx`: the menu item of that action.
 - `apps/web/src/components/settings/SettingsSidebarNav.tsx`: icon of the Fork settings page.
 - `apps/web/src/components/settings/settingsSearch.ts`: Fork settings page and its search entries.
+- `apps/web/src/fileContextMenu.ts`: "Open in system browser" in the file tree and diff menus.
 - `apps/web/src/routeTree.gen.ts`: generated; on a conflict take upstream's and run `vp run dev`
   once to regenerate it with the fork's settings route.
 - `apps/web/src/routes/_chat.tsx`: mounts `ForkStyles` (`fork.css` and the custom CSS).
+- `packages/contracts/src/editor.ts`: the `systemBrowser` flag of the launch input.
 - `packages/contracts/src/index.ts`: exports `forkSettings.ts`.
 - `packages/contracts/src/settings.ts`: the `fork` key in server settings and their patch.
 - `CLAUDE.md`: imports this README.
