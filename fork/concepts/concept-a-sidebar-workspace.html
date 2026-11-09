@@ -1,128 +1,127 @@
 <!doctype html>
-<html lang="it">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Concept A - Sidebar a workspace</title>
+    <title>Concept A - Workspace sidebar</title>
     <!--
-			Scelta: C (Strip) al giro 2, con le righe globali Needs you, Snoozed e Settled. Aperti: drag
-			(riordino gruppi, tab fra workspace), mobile, sync dei gruppi nel codice vero.
+			Decision: C (Strip) in round 2, with the global rows Needs you, Snoozed and Settled. Open:
+			drag (reordering groups, tabs across workspaces), mobile, syncing groups in the real code.
 
-			Concept A: con la sidebar a workspace (progetti) e i thread come tab sopra la chat, dove
-			vivono gli stati di oggi (pinned, working, snoozed, settled).
-			Tasti: x a b c per la variante, t tema, p nasconde la barra (con i controlli dev), s cicla lo stato
-			della tab aperta. Click destro su una tab (o su una riga thread in X) apre il menu vero;
-			click destro su una riga workspace apre il menu del progetto. Solo desktop (min 1200px).
+			Concept A: a workspace (project) sidebar with threads as tabs above the chat, and where
+			today's states live (pinned, working, snoozed, settled).
+			Keys: x a b c pick the variant, t theme, p hides the bar (with the dev controls), s cycles
+			the open tab's state. Right-click a tab (or a thread row in X) for the real menu;
+			right-click a workspace row for the project menu. Desktop only (min 1200px).
 
-			Il problema: la sidebar di T3 è centrata sui thread. Con tanti progetti aperti diventa una
-			lista lunga di card da 78px dove il progetto è una riga di metadati; per sapere "cosa c'è
-			aperto su relay" serve il filtro per progetto o la boring sidebar (beta). Simone vuole il
-			modello di Relay: la sidebar elenca i progetti, i thread di un progetto sono tab.
+			The problem: T3's sidebar is centered on threads. With many open projects it becomes a long
+			list of 78px cards where the project is a metadata line; seeing "what is open on relay"
+			takes the project filter or the boring sidebar (beta). The goal is Relay's model: the
+			sidebar lists projects, and a project's threads are tabs.
 
-			Requisiti fissi (uguali in A, B, C):
-			- Sidebar = workspace (progetti). Thread = tab in una strip in cima al contenuto.
-			- Ogni tab ha il suo indicatore di stato e le azioni per-thread di oggi (menu completo,
-			  hover Snooze e Settle). Le tab pinnate stanno a sinistra della strip.
-			- La riga del workspace mostra lo stato più urgente fra le sue tab vive:
-			  needs you (Approval, Input) > Failed > Working > Done (finito non letto) > idle.
-			- Gruppi di workspace come Relay: card collassabili con conteggio, sincronizzate.
-			  Workspace pinnati in cima.
-			- Gli stati di oggi esistono tutti: Pinned, Working, Snoozed, Settled.
+			Fixed requirements (the same in A, B, C):
+			- Sidebar = workspaces (projects). Thread = a tab in a strip above the content.
+			- Each tab has its status indicator and today's per-thread actions (full menu, Snooze and
+			  Settle on hover). Pinned tabs sit left in the strip.
+			- The workspace row shows the most urgent state among its live tabs:
+			  needs you (Approval, Input) > Failed > Working > Done (finished, unread) > idle.
+			- Workspace groups like Relay: collapsible cards with a count, synced. Pinned workspaces on
+			  top.
+			- All of today's states exist: Pinned, Working, Snoozed, Settled.
 
-			X  oggi: replica della sidebar di T3 (card thread a tre righe, pinned in cima senza
-			   etichetta, shelf Working (beta), Snoozed e Settled collassati in fondo), contenuto
-			   senza strip. Termine di paragone.
-			A  Inbox: in cima alla sidebar uno shelf trasversale di TAB (Needs you, poi Working), sotto
-			   pinned, gruppi e workspace; Snoozed e Settled sono shelf di tab collassati in fondo alla
-			   sidebar, come oggi. La strip mostra solo le tab vive.
-			B  Sections: niente shelf di tab. I workspace sono ordinati in sezioni (Pinned, Needs you,
-			   Working, Idle) secondo la tab più urgente, i gruppi dentro le sezioni. Le tab snoozed e
-			   settled si ripiegano nel "+N" in fondo alla strip, come in C (B decide solo la sidebar).
-			C  Strip: sidebar solo pinned, gruppi e workspace con badge (Relay puro). Pinned a sinistra
-			   della strip, snoozed e settled nel "+N" in fondo alla strip.
-			Quindi: A contro C confronta "stati delle tab in sidebar" contro "stati delle tab nella
-			strip"; B contro C confronta "sezioni per stato" contro "ordine stabile".
+			X  today: a replica of T3's sidebar (three-line thread cards, pinned on top without a label,
+			   Working shelf (beta), Snoozed and Settled collapsed at the bottom), content without a
+			   strip. The baseline.
+			A  Inbox: a cross-project shelf of TABS at the top of the sidebar (Needs you, then Working),
+			   then pinned, groups and workspaces; Snoozed and Settled are collapsed tab shelves at the
+			   bottom of the sidebar, as today. The strip shows live tabs only.
+			B  Sections: no tab shelves. Workspaces are sorted into sections (Pinned, Needs you, Working,
+			   Idle) by their most urgent tab, with groups inside the sections. Snoozed and settled tabs
+			   fold into the "+N" at the end of the strip, as in C (B decides the sidebar only).
+			C  Strip: the sidebar has only pinned, groups and workspaces with badges (pure Relay). Pinned
+			   tabs on the left of the strip, snoozed and settled in the "+N" at its end.
+			So: A against C compares "tab states in the sidebar" with "tab states in the strip"; B
+			against C compares "sections by state" with "stable order".
 
-			Ispirazione: Relay (docs/features/sidebar.md, attention.md, images/hero.png e home.png,
+			Inspiration: Relay (docs/features/sidebar.md, attention.md, images/hero.png and home.png,
 			concepts/concept-a-navigazione.html).
-			Preso: workspace = progetto e tab = sessione; card di gruppo (collasso, conteggio, chiusa
-			mostra lo stato del membro più urgente come la cartella della boring sidebar); pinned in
-			cima con l'icona pin al posto della cartella; riga a due linee (nome, poi la tab che conta);
-			il campo "Go to project…" in testa; il "Needs you / Working" della Home di Relay, che in A
-			diventa lo shelf.
-			Non preso: i colori dei gruppi (T3 è monocromo e il colore in sidebar significa stato);
-			Home e Projects come pagine (decisione a parte, e in A si sovrapporrebbe all'inbox);
-			l'anello di attenzione attorno al contenuto; il bump della riga in cima a ogni attività
-			non vista; ⌘P, perché in T3 la palette è già ⌘K.
+			Taken: workspace = project and tab = session; group cards (collapse, count, when closed they
+			show the most urgent member's state like the boring sidebar's folder); pinned on top with the
+			pin icon instead of the folder; a two-line row (name, then the tab that matters); the
+			"Go to project..." field on top; the "Needs you / Working" of Relay's Home, which becomes the
+			shelf in A.
+			Not taken: group colors (T3 is monochrome and color in the sidebar means state); Home and
+			Projects as pages (a separate decision, and in A it would overlap the inbox); the attention
+			ring around the content; bumping the row to the top on every unseen activity; Cmd+P, because
+			T3's palette is already Cmd+K.
 
-			Mappatura sul codice di oggi (fattibilità, non piano):
-			- Stato per tab: `resolveSidebarThreadStatus` in apps/web/src/components/Sidebar.logic.ts,
-			  con le etichette e le icone di `topStatus` in sidebar/SidebarThreadRow.tsx (Approval,
-			  Input, Request, Limited, Failed, Woke, Done, Working, Waiting). Già per thread.
-			- Stato del workspace: esiste già `resolveProjectStatusIndicator` (Sidebar.logic.ts), con
-			  la priorità Pending Approval > Awaiting Input > Guest Request > Failed > Working >
-			  Waiting > Plan Ready > Completed: coincide con l'ordine chiesto. Attenzione: il pallino
-			  delle cartelle della boring sidebar (`resolveSidebarFolderDot`) mette unread SOPRA
-			  working. Oggi convivono due regole; la riga workspace ne deve scegliere una.
-			- Azioni della tab: `buildThreadActionMenuItems` (threadActionMenu.logic.ts), la stessa
-			  lista del mock. "Filter by <project>" perde senso (il workspace è già il filtro), quindi
-			  nel mock c'è solo in X. "Turn into project" resta per le tab di No project.
-			  Hover: Snooze (`SnoozeMenuButton`, preset da DEFAULT_SNOOZE_PRESETS) e Settle.
-			- Progetti e thread sono già stato server sincronizzato (proiezioni dell'orchestrazione).
-			  Il pin di progetto esiste già (`pinnedAt` in contracts/orchestrationProject.ts, usato
-			  dalla boring sidebar); i thread hanno già pin, ordine server, snooze e settle.
-			- Gruppi: campo nuovo in `ServerSettings` (packages/contracts/src/settings.ts, persistito
-			  nel settings.json dell'environment), per esempio `projectGroups: [{ id, name,
-			  projectKeys }]`, non nel database. Si vede da tutti i client dello stesso environment;
-			  con più environment ogni environment ha i suoi gruppi, salvo un salvataggio su "All
-			  environments" come le snooze options. Lo stato aperto/chiuso della card resta per
-			  device, come le cartelle di oggi.
-			- Nuovo: la strip di tab sopra ChatHeader, la riga workspace con lo stato aggregato, la
-			  card di gruppo e il suo drag, l'overflow "+N" (B, C) o gli shelf di tab (A).
-			- Desktop avvolge il web, quindi la stessa modifica vale per web e desktop. Mobile resta
-			  thread-centrico: il modello a workspace andrebbe deciso anche lì, fuori da questo mock.
+			Mapping to today's code (feasibility, not a plan):
+			- Per-tab state: `resolveSidebarThreadStatus` in apps/web/src/components/Sidebar.logic.ts,
+			  with the labels and icons of `topStatus` in sidebar/SidebarThreadRow.tsx (Approval, Input,
+			  Request, Limited, Failed, Woke, Done, Working, Waiting). Already per thread.
+			- Workspace state: `resolveProjectStatusIndicator` (Sidebar.logic.ts) already exists, with
+			  the priority Pending Approval > Awaiting Input > Guest Request > Failed > Working > Waiting
+			  > Plan Ready > Completed, which matches the requested order. Note: the boring sidebar's
+			  folder dot (`resolveSidebarFolderDot`) puts unread ABOVE working. Two rules coexist today,
+			  and the workspace row has to pick one.
+			- Tab actions: `buildThreadActionMenuItems` (threadActionMenu.logic.ts), the same list as the
+			  mock. "Filter by <project>" loses its point (the workspace is already the filter), so the
+			  mock has it only in X. "Turn into project" stays for No project tabs. Hover: Snooze
+			  (`SnoozeMenuButton`, presets from DEFAULT_SNOOZE_PRESETS) and Settle.
+			- Projects and threads are already synced server state (orchestration projections). Project
+			  pins already exist (`pinnedAt` in contracts/orchestrationProject.ts, used by the boring
+			  sidebar); threads already have pin, server order, snooze and settle.
+			- Groups: a new field in `ServerSettings` (packages/contracts/src/settings.ts, persisted in
+			  the environment's settings.json), for example `projectGroups: [{ id, name, projectKeys }]`,
+			  not in the database. All clients of an environment see it; with several environments each
+			  has its own groups, unless saved to "All environments" like the snooze options. A card's
+			  open or closed state stays per device, like today's folders.
+			- New: the tab strip above ChatHeader, the workspace row with the aggregate state, the group
+			  card and its drag, the "+N" overflow (B, C) or the tab shelves (A).
+			- Desktop wraps web, so the same change covers both. Mobile stays thread-centered: the
+			  workspace model would have to be decided there too, outside this mock.
 
-			Dati: inventati e plausibili. Progetti personali di Simone (t3code, relay, claude-setup,
-			nexus, floppy, esse.dev, portsage, un nome lungo per il troncamento, No project per i
-			thread senza progetto), gruppi "Personal tools" e "Sites", t3code con 9 tab (7 vive) per
-			stressare la strip. Titoli, branch e messaggi inventati; modelli presi dai default del
-			repo (Opus 5.5, Sonnet 5, GPT-6 Astra, GPT-5.6 Sol). Ora finta: lunedì 2 nov, 4:20 PM.
-			Token: valori copiati da apps/web/src/index.css (tema scuro e chiaro, blocco
-			[data-app-sidebar]) e dalla palette Tailwind 4.3.3; icone di stato lucide come in T3.
+			Data: invented and plausible. Personal projects (t3code, relay, claude-setup, nexus, floppy,
+			esse.dev, portsage, a long name for truncation, No project for threads without a project),
+			groups "Personal tools" and "Sites", t3code with 9 tabs (7 live) to stress the strip. Titles,
+			branches and messages are invented; models come from the repo's defaults (Opus 5.5, Sonnet 5,
+			GPT-6 Astra, GPT-5.6 Sol). Fake time: Monday Nov 2, 4:20 PM.
+			Tokens: values copied from apps/web/src/index.css (dark and light theme,
+			[data-app-sidebar] block) and the Tailwind 4.3.3 palette; lucide status icons as in T3.
 
-			Giro 2: Simone sceglie C. Il feedback tocca solo C; X, A e B restano nel file come erano.
-			- Priorità del badge invariata (confermata da Simone): needs you (Approval, Input) >
-			  Failed > Working > Done (finito non letto) > idle. Coincide con
-			  `resolveProjectStatusIndicator`, non col pallino delle cartelle
-			  (`resolveSidebarFolderDot`, che mette unread sopra working).
-			- In fondo alla sidebar, fuori dallo scroll, tre righe globali compatte: Needs you,
-			  Snoozed, Settled, ognuna col conteggio. Ognuna apre un popover cross-workspace accanto
-			  alla sidebar: Needs you raggruppa Waiting for you (Approve e Decline sul posto per le
-			  approvazioni, Answer per le domande), Failed e Finished, not read; Snoozed mostra l'ora
-			  di risveglio e Wake; Settled le 10 più recenti con Un-settle e "Show all settled". Una
-			  voce apre il suo workspace e la sua tab. I conteggi seguono il controllo dev e le
-			  azioni del menu (snooze, settle, wake, archive).
-			- Il "+N" della strip apre lo stesso popover limitato al workspace: Snoozed in cima con
-			  ora e Wake, poi Settled (ultime 10) con "Show all settled".
-			- Icone dei workspace come T3 (`ProjectFavicon`, apps/web/src/components/ProjectFavicon.tsx):
-			  1. override dell'utente da Project settings (`projectIcon`: monogram, emoji o icona
-			     lucide con colore);
-			  2. altrimenti la favicon del repo, che il server cerca (apps/server/src/project/
-			     ProjectFaviconResolver.ts) fra `faviconPath` di t3.json, una lista fissa di file
-			     (favicon.svg/.ico/.png in radice, public/, app/, src/, assets/icon e logo,
-			     AppIcon.icns) e il <link rel="icon"> di index.html o della root route;
-			  3. senza favicon, il monogramma di `deriveProjectIdentity` (apps/web/src/
-			     projectIdentity.ts): due glifi dal nome (prima lettera più la prima cifra, o
-			     l'iniziale dell'ultima parola, o l'ultima lettera) e uno dei 18 colori di
-			     PROJECT_ICON_COLORS scelto da un hash del nome, tinta 600 in chiaro e 400 in scuro
-			     su un fondo al 14% (`ProjectMonogram`). FolderCodeIcon resta solo per un nome vuoto.
-			  Nel mock la stessa logica in JS. Ho guardato i repo veri: solo esse.dev ha una favicon
-			  fra i candidati (public/favicon.svg, copiata inline); portsage punta a /vite.svg che
-			  non esiste, quindi monogramma come gli altri. No project non ha un progetto e T3 non gli
-			  dà icona: tengo l'icona chat neutra. In C il pin del workspace diventa un pin piccolo
-			  dopo il nome, perché sostituire l'icona farebbe perdere l'identità del progetto.
-			- Dati: più tab settled (19 in tutto, 13 su t3code) per mettere alla prova il limite di
-			  10, e una snoozed in più su relay. Le tab vive restano quelle del primo giro.
+			Round 2: C is chosen. The feedback touches only C; X, A and B stay in the file as they were.
+			- Badge priority unchanged (confirmed): needs you (Approval, Input) > Failed > Working > Done
+			  (finished, unread) > idle. It matches `resolveProjectStatusIndicator`, not the folder dot
+			  (`resolveSidebarFolderDot`, which puts unread above working).
+			- At the bottom of the sidebar, outside the scroll, three compact global rows: Needs you,
+			  Snoozed, Settled, each with its count. Each opens a cross-workspace popover next to the
+			  sidebar: Needs you groups Waiting for you (Approve and Decline in place for approvals,
+			  Answer for questions), Failed and Finished, not read; Snoozed shows the wake time and Wake;
+			  Settled the 10 most recent with Un-settle and "Show all settled". An entry opens its
+			  workspace and tab. Counts follow the dev control and the menu actions (snooze, settle,
+			  wake, archive).
+			- The strip's "+N" opens the same popover limited to the workspace: Snoozed on top with time
+			  and Wake, then Settled (latest 10) with "Show all settled".
+			- Workspace icons as in T3 (`ProjectFavicon`, apps/web/src/components/ProjectFavicon.tsx):
+			  1. the user's override from Project settings (`projectIcon`: monogram, emoji or lucide icon
+			     with a color);
+			  2. otherwise the repo's favicon, which the server looks for (apps/server/src/project/
+			     ProjectFaviconResolver.ts) among t3.json's `faviconPath`, a fixed list of files
+			     (favicon.svg/.ico/.png in the root, public/, app/, src/, assets/icon and logo,
+			     AppIcon.icns) and the <link rel="icon"> of index.html or the root route;
+			  3. with no favicon, the monogram of `deriveProjectIdentity` (apps/web/src/
+			     projectIdentity.ts): two glyphs from the name (first letter plus the first digit, or
+			     the last word's initial, or the last letter) and one of the 18 PROJECT_ICON_COLORS
+			     picked by a hash of the name, tint 600 in light and 400 in dark on a 14% background
+			     (`ProjectMonogram`). FolderCodeIcon remains only for an empty name.
+			  The mock has the same logic in JS. Checked against the real repos: only esse.dev has a
+			  favicon among the candidates (public/favicon.svg, copied inline); portsage points at
+			  /vite.svg, which does not exist, so it gets a monogram like the others. No project has no
+			  project and T3 gives it no icon: it keeps the neutral chat icon. In C the workspace pin
+			  becomes a small pin after the name, because replacing the icon would lose the project's
+			  identity.
+			- Data: more settled tabs (19 in all, 13 on t3code) to test the limit of 10, and one more
+			  snoozed tab on relay. The live tabs stay those of the first round.
 		-->
     <style>
       /* Tokens copied from apps/web/src/index.css and Tailwind 4.3.3 theme.css. Light first, as in T3. */
@@ -1505,10 +1504,10 @@
 
     <script>
       const DESC = {
-        x: "oggi: la sidebar di thread di T3 (pinned, active, Working, Snoozed, Settled), il termine di paragone",
-        a: "Inbox: le tab che ti cercano stanno in cima alla sidebar, trasversali ai progetti; snoozed e settled restano shelf in sidebar",
-        b: "Sections: la sidebar ordina i progetti per urgenza (Needs you, Working, Idle), niente lista di tab; parcheggiate nel +N della strip",
-        c: "Strip: la sidebar resta Relay puro (gruppi e badge, ordine stabile), tutti gli stati delle tab vivono nella strip",
+        x: "today: T3's thread sidebar (pinned, active, Working, Snoozed, Settled), the baseline",
+        a: "Inbox: tabs that need you sit at the top of the sidebar, across projects; snoozed and settled stay as sidebar shelves",
+        b: "Sections: the sidebar sorts projects by urgency (Needs you, Working, Idle), no tab list; parked tabs go in the strip's +N",
+        c: "Strip: the sidebar stays pure Relay (groups and badges, stable order), all tab states live in the strip",
       };
 
       /* Data: invented, declared in the header. */

@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="it">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Fork T3 Code: come arrivano gli aggiornamenti</title>
+    <title>T3 Code fork: how updates arrive</title>
     <style>
       :root {
         --bg: #f6f5f2;
@@ -333,205 +333,205 @@
   </head>
   <body>
     <main>
-      <h1>Fork T3 Code: come arrivano gli aggiornamenti</h1>
+      <h1>T3 Code fork: how updates arrive</h1>
       <p class="lead">
-        Chi fa cosa, cosa è manuale e cosa automatico, e che numeri di versione escono.
+        Who does what, what is manual, what is automatic, and which versions come out.
       </p>
 
-      <h2>I quattro attori</h2>
+      <h2>The four actors</h2>
       <div class="actors">
         <div class="actor up">
           <span class="tag">pingdotgg</span><b>Upstream</b
           ><span
-            ><code>pingdotgg/t3code</code>. Theo e soci pubblicano le stable (<code>v0.1.6</code>,
-            <code>v0.1.7</code>…). Non lo tocchi mai.</span
+            ><code>pingdotgg/t3code</code>. The maintainers publish the stables
+            (<code>v0.1.6</code>, <code>v0.1.7</code>...). You never touch it.</span
           >
         </div>
         <div class="actor me">
-          <span class="tag">locale</span><b>Il tuo Mac</b
+          <span class="tag">local</span><b>Your Mac</b
           ><span
-            >Il checkout sul branch <code>fork</code>, il certificato self-signed e
-            <code>fork/release.sh</code>. Qui si fa la build firmata.</span
+            >The checkout on the <code>fork</code> branch, the self-signed certificate and
+            <code>fork/release.sh</code>. The signed build happens here.</span
           >
         </div>
         <div class="actor gh">
-          <span class="tag">essedev</span><b>Il tuo fork su GitHub</b
+          <span class="tag">essedev</span><b>Your fork on GitHub</b
           ><span
-            ><code>essedev/t3code</code>. Le sue Releases sono il "negozio" da cui la tua app
-            scarica gli update.</span
+            ><code>essedev/t3code</code>. Its Releases are the "store" your app downloads updates
+            from.</span
           >
         </div>
         <div class="actor app">
-          <span class="tag">installata</span><b>La tua app</b
+          <span class="tag">installed</span><b>Your app</b
           ><span
-            >T3 Code installata in <code>/Applications</code>. Controlla le Releases del fork, non
-            quelle ufficiali.</span
+            >T3 Code installed in <code>/Applications</code>. It checks the fork's Releases, not the
+            official ones.</span
           >
         </div>
       </div>
 
-      <h2>Caso 1: esce una nuova stable upstream</h2>
+      <h2>Case 1: upstream publishes a new stable</h2>
       <div class="flows">
         <div class="flow">
-          <h3>Vuoi solo stare al passo, senza modifiche nuove tue</h3>
+          <h3>You only want to keep up, with no new changes of your own</h3>
           <div class="steps">
             <div class="step up">
               <div class="who">Upstream</div>
-              Pubblica <code>v0.1.7</code>.
+              Publishes <code>v0.1.7</code>.
             </div>
             <div class="arrow">→</div>
             <div class="step me">
-              <div class="who">Tu, 2 comandi</div>
-              <code>git fetch upstream --tags</code><br /><code>git rebase v0.1.7</code><br />Le tue
-              modifiche vengono riapplicate sopra la 0.1.7. Conflitti solo se upstream ha cambiato
-              gli stessi file.
+              <div class="who">You, 2 commands</div>
+              <code>git fetch upstream --tags</code><br /><code>git rebase v0.1.7</code><br />Your
+              changes are reapplied on top of 0.1.7. Conflicts only if upstream changed the same
+              files.
             </div>
             <div class="arrow">→</div>
             <div class="step me">
-              <div class="who">Tu, 1 comando</div>
-              <code>fork/release.sh</code><br />Build firmata della <b>0.1.7</b> e pubblicazione su
-              <code>essedev/t3code</code>. Circa 5 minuti.
+              <div class="who">You, 1 command</div>
+              <code>fork/release.sh</code><br />Signed build of <b>0.1.7</b>, published to
+              <code>essedev/t3code</code>. About 5 minutes.
             </div>
             <div class="arrow">→</div>
             <div class="step auto">
-              <div class="who">Automatico</div>
-              L'app vede la 0.1.7, la scarica e si riavvia aggiornata. Come nel test.
+              <div class="who">Automatic</div>
+              The app sees 0.1.7, downloads it and restarts updated.
             </div>
           </div>
           <p class="note">
-            Il fork non segue upstream da solo: finché non lanci rebase e release, la tua app resta
-            dov'è. In futuro questo giro si può affidare a una GitHub Action, quando il rebase passa
-            senza conflitti.
+            The fork does not follow upstream by itself: until you run the rebase and the release,
+            your app stays where it is. A GitHub Action could take this over later, when the rebase
+            passes without conflicts.
           </p>
         </div>
       </div>
 
-      <h2>Caso 2: fai una modifica tua tra due stable</h2>
+      <h2>Case 2: you make a change between two stables</h2>
       <div class="flows">
         <div class="flow">
-          <h3>Esempio: aggiungi una funzione mentre upstream è ancora alla 0.1.7</h3>
+          <h3>Example: you add a feature while upstream is still on 0.1.7</h3>
           <div class="steps">
             <div class="step me">
-              <div class="who">Tu</div>
-              Lavori sul branch <code>fork</code> e committi.
+              <div class="who">You</div>
+              Work on the <code>fork</code> branch and commit.
             </div>
             <div class="arrow">→</div>
             <div class="step me">
-              <div class="who">Tu, 1 comando</div>
-              <code>fork/release.sh</code><br />Vede che la 0.1.7 del fork è già uscita e rilascia
-              una prerelease della successiva: <b>0.1.8-fork.1</b>.
+              <div class="who">You, 1 command</div>
+              <code>fork/release.sh</code><br />It sees the fork's 0.1.7 is already out and releases
+              a prerelease of the next patch: <b>0.1.8-fork.1</b>.
             </div>
             <div class="arrow">→</div>
             <div class="step auto">
-              <div class="who">Automatico</div>
-              L'app si aggiorna alla 0.1.8-fork.1.
+              <div class="who">Automatic</div>
+              The app updates to 0.1.8-fork.1.
             </div>
           </div>
           <p class="note">
-            Il suffisso serve perché l'updater propone solo versioni più alte di quella installata.
-            Semver ordina 0.1.7 &lt; 0.1.8-fork.1 &lt; 0.1.8-fork.2 &lt; 0.1.8, quindi quando
-            upstream pubblica la 0.1.8 la tua app la riceve comunque.
+            The suffix exists because the updater offers only versions higher than the installed
+            one. Semver orders 0.1.7 &lt; 0.1.8-fork.1 &lt; 0.1.8-fork.2 &lt; 0.1.8, so when
+            upstream publishes 0.1.8 your app still receives it.
           </p>
         </div>
       </div>
 
-      <h2>Le versioni nel tempo</h2>
+      <h2>Versions over time</h2>
       <div class="timeline">
         <div class="track">
           <div class="ver up">
             <div class="dot"></div>
-            <b>0.1.6</b><span>parti da qui, uguale a upstream</span>
+            <b>0.1.6</b><span>start here, same as upstream</span>
           </div>
           <div class="ver me">
             <div class="dot"></div>
-            <b>0.1.7-fork.1</b><span>tua modifica</span>
+            <b>0.1.7-fork.1</b><span>your change</span>
           </div>
           <div class="ver me">
             <div class="dot"></div>
-            <b>0.1.7-fork.2</b><span>altra tua modifica</span>
+            <b>0.1.7-fork.2</b><span>another change of yours</span>
           </div>
           <div class="ver up">
             <div class="dot"></div>
-            <b>0.1.7</b><span>rebase su upstream: le tue modifiche ci sono ancora</span>
+            <b>0.1.7</b><span>rebase on upstream: your changes are still there</span>
           </div>
           <div class="ver me">
             <div class="dot"></div>
-            <b>0.1.8-fork.1</b><span>tua modifica</span>
+            <b>0.1.8-fork.1</b><span>your change</span>
           </div>
           <div class="ver up">
             <div class="dot"></div>
-            <b>0.1.8</b><span>rebase su upstream</span>
+            <b>0.1.8</b><span>rebase on upstream</span>
           </div>
         </div>
         <div class="legend">
-          <span><i style="background: var(--up)"></i>versione uguale a upstream</span
-          ><span><i style="background: var(--me)"></i>versione con suffisso del fork</span>
+          <span><i style="background: var(--up)"></i>version matching upstream</span
+          ><span><i style="background: var(--me)"></i>version with the fork suffix</span>
         </div>
       </div>
 
-      <h2>Cosa funziona con ciascun tipo di versione</h2>
+      <h2>What works with each kind of version</h2>
       <table>
         <tr>
           <th></th>
-          <th>Uguale a upstream (0.1.7)</th>
-          <th>Con suffisso (0.1.8-fork.1)</th>
+          <th>Matching upstream (0.1.7)</th>
+          <th>With suffix (0.1.8-fork.1)</th>
         </tr>
         <tr>
-          <td>Uso normale dell'app, thread, provider, Connect</td>
-          <td class="yes">Sì</td>
-          <td class="yes">Sì</td>
+          <td>Normal app use, threads, providers, Connect</td>
+          <td class="yes">Yes</td>
+          <td class="yes">Yes</td>
         </tr>
         <tr>
-          <td>Update in-app dal tuo fork</td>
-          <td class="yes">Sì</td>
-          <td class="yes">Sì</td>
+          <td>In-app update from your fork</td>
+          <td class="yes">Yes</td>
+          <td class="yes">Yes</td>
         </tr>
         <tr>
-          <td>Servizio in background, environment SSH, <code>t3 update</code></td>
-          <td class="yes">Sì</td>
+          <td>Background service, SSH environments, <code>t3 update</code></td>
+          <td class="yes">Yes</td>
           <td>
-            <span class="no">No</span>, fino alla stable successiva. Scaricano il runtime CLI da
-            upstream per numero di versione, e la 0.1.8-fork.1 lì non esiste.
+            <span class="no">No</span>, until the next stable. They download the CLI runtime from
+            upstream by version number, and 0.1.8-fork.1 does not exist there.
           </td>
         </tr>
       </table>
 
-      <h2>Manuale o automatico</h2>
+      <h2>Manual or automatic</h2>
       <table>
         <tr>
-          <th>Passo</th>
-          <th>Chi</th>
-          <th>Quando</th>
+          <th>Step</th>
+          <th>Who</th>
+          <th>When</th>
         </tr>
         <tr>
-          <td>Certificato self-signed e trust</td>
-          <td><span class="pill manual">manuale</span></td>
-          <td>Una volta sola, già fatto.</td>
+          <td>Self-signed certificate and trust</td>
+          <td><span class="pill manual">manual</span></td>
+          <td>Once, already done.</td>
         </tr>
         <tr>
-          <td>Creare il fork <code>essedev/t3code</code></td>
-          <td><span class="pill manual">manuale</span></td>
-          <td>Una volta sola, già fatto.</td>
+          <td>Creating the fork <code>essedev/t3code</code></td>
+          <td><span class="pill manual">manual</span></td>
+          <td>Once, already done.</td>
         </tr>
         <tr>
-          <td>Prima installazione del fork al posto di Nightly</td>
-          <td><span class="pill manual">manuale</span></td>
-          <td>Una volta sola: trascini il DMG in Applicazioni.</td>
+          <td>First install of the fork in place of Nightly</td>
+          <td><span class="pill manual">manual</span></td>
+          <td>Once: drag the DMG to Applications.</td>
         </tr>
         <tr>
-          <td>Rebase su una nuova stable</td>
-          <td><span class="pill manual">manuale</span></td>
-          <td>A ogni stable upstream che vuoi prendere.</td>
+          <td>Rebase on a new stable</td>
+          <td><span class="pill manual">manual</span></td>
+          <td>For each upstream stable you want to take.</td>
         </tr>
         <tr>
           <td><code>fork/release.sh</code></td>
-          <td><span class="pill manual">manuale</span></td>
-          <td>Dopo un rebase o una modifica tua.</td>
+          <td><span class="pill manual">manual</span></td>
+          <td>After a rebase or a change of yours.</td>
         </tr>
         <tr>
-          <td>Download, installazione, riavvio dell'app</td>
-          <td><span class="pill auto">automatico</span></td>
-          <td>Sempre, dall'app.</td>
+          <td>App download, install and restart</td>
+          <td><span class="pill auto">automatic</span></td>
+          <td>Always, from the app.</td>
         </tr>
       </table>
     </main>

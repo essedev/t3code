@@ -64,18 +64,10 @@ commands and a migration, the native T3 way, for the reasons above.
 Status: active (2026-11-02)
 
 A fork-only sidebar, switchable against upstream's, lists workspaces (projects) and groups like
-Relay; threads become tabs above the chat. Each tab has upstream's sidebar status icon and today's
-thread actions; the workspace row shows the most urgent tab. A workspace is listed only while it has
-an open tab, is pinned or is on screen; the rest are reached from the command palette (`Cmd+N`,
-Go to project). Rejected: listing every project, which turned the sidebar back into an archive, and
-an "Other projects" fold, which duplicated the palette (2026-11-03). The order is the user's (drags, pins,
-groups) plus Relay's bump: a workspace whose tab starts waiting on the user moves to the top of its
-group or list and stays there; derived status sorting was rejected because rows would keep moving. Pinned tabs sit left in the strip, snoozed and settled
-fold into its `+N`; compact global rows (Needs you, Snoozed, Settled) list tabs across workspaces.
-Built in new files that import upstream's status and action logic. Concept:
-`concepts/concept-a-sidebar-workspace.html`. Rejected: an inbox shelf of tabs on top (A, pushes
-workspaces below the fold) and status sections of workspaces (B, rows move under the cursor and
-groups split).
+Relay; threads become tabs above the chat, and every tab state lives in the strip and in compact
+global rows. Order is the user's plus Relay's bump, because derived status sorting moves rows under
+the cursor. Rejected: an inbox shelf of tabs (A), status sections (B), listing every project and an
+"Other projects" fold. Detail: `features/workspace-sidebar.md`.
 
 ## 8. Fork code lives in new files marked "fork", upstream files only get mount points
 
