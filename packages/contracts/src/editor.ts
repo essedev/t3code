@@ -159,6 +159,8 @@ export const LaunchEditorInput = Schema.Struct({
   editor: EditorId,
   /** Only for file-manager; requires the server's shellRevealInFileManager capability. */
   reveal: Schema.optional(Schema.Boolean),
+  /** Fork: only for file-manager on macOS; opens the file in the default web browser. */
+  systemBrowser: Schema.optional(Schema.Boolean),
 });
 export type LaunchEditorInput = typeof LaunchEditorInput.Type;
 

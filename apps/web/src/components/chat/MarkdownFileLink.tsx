@@ -8,6 +8,7 @@ import {
 import type { EnvironmentId, ScopedThreadRef } from "@t3tools/contracts";
 import { memo, useState, type MouseEvent as ReactMouseEvent } from "react";
 
+import { OPEN_IN_SYSTEM_BROWSER_LABEL } from "../../fork/systemBrowser";
 import { readLocalApi } from "../../localApi";
 import { cn } from "../../lib/utils";
 import { shouldOpenMarkdownFileLinkInEditor } from "../../markdown-links";
@@ -43,6 +44,7 @@ interface MarkdownFileLinkProps {
   resolveCopyPaths: () => Promise<ReturnType<typeof markdownFileCopyPaths>>;
   openInEditorMenuLabel: string;
   onOpenInBrowser?: (() => Promise<AtomCommandResult<unknown, unknown>>) | undefined;
+  onOpenInSystemBrowser?: (() => void) | undefined;
   onOpenMedia?: (() => void) | undefined;
   onReveal?: (() => Promise<AtomCommandResult<unknown, unknown>>) | undefined;
   revealLabel?: string | undefined;
@@ -67,6 +69,7 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
   onOpenInPanel,
   openInEditorMenuLabel,
   onOpenInBrowser,
+  onOpenInSystemBrowser,
   onOpenMedia,
   onReveal,
   revealLabel,
@@ -257,6 +260,9 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
           ...(onOpenInBrowser
             ? ([{ id: "open-in-browser", label: "Open in integrated browser" }] as const)
             : []),
+          ...(onOpenInSystemBrowser
+            ? ([{ id: "open-in-system-browser", label: OPEN_IN_SYSTEM_BROWSER_LABEL }] as const)
+            : []),
           ...(onReveal && revealLabel ? ([{ id: "reveal", label: revealLabel }] as const) : []),
           ...copyItems.map(({ id, label }) => ({ id, label })),
         ] as const,
@@ -273,6 +279,10 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
       }
       if (clicked === "open-in-browser") {
         handleOpenInBrowser();
+        return;
+      }
+      if (clicked === "open-in-system-browser") {
+        onOpenInSystemBrowser?.();
         return;
       }
       if (clicked === "reveal") {
