@@ -1,18 +1,19 @@
 # essedev/t3code fork
 
 A personal fork of [pingdotgg/t3code](https://github.com/pingdotgg/t3code) that ships its own
-macOS desktop builds with working in-app updates. Everything fork-specific lives in `fork/`, plus
-one import line in `CLAUDE.md`, so rebasing on a new upstream release rarely conflicts.
+macOS desktop builds with working in-app updates. Its scripts and docs live in `fork/`, its app
+features in new files with "fork" in their path, and upstream files change only as the table below
+lists, so rebasing on a new upstream release rarely conflicts.
 
 Fork docs, all in this folder:
 
 - [`DECISIONS.md`](DECISIONS.md): why the fork works this way, numbered and citable as `#N`.
 - [`ROADMAP.md`](ROADMAP.md): what is in progress or next.
+- [`BACKLOG.md`](BACKLOG.md): open work nobody is about to do.
 - `changelog/YYYY-MM.md`: every release in order, newest first, one file per month. Written by
   `release.sh`, never by hand.
-- `features/<name>.md`: one page per fork-only feature, created with the feature:
-  [`workspace-sidebar.md`](features/workspace-sidebar.md),
-  [`fork-settings.md`](features/fork-settings.md).
+- `features/<name>.md`: one page per fork-only feature, created with the feature.
+- `concepts/`: the design mocks behind a feature, linked from its page.
 - [`release-flow.html`](release-flow.html): visual overview of the release flow.
 
 ## Differences from upstream
@@ -81,8 +82,11 @@ the changelog, so write them for a reader.
 git fetch upstream --tags
 git rebase v0.1.7          # the new upstream stable tag
 bash fork/release.sh
-git push --force-with-lease origin fork   # only if release.sh stopped before pushing
 ```
+
+`release.sh` pushes the rebased branch with `--force-with-lease`. If it stops before pushing, fix
+the cause and run it again: the changelog entry is not written twice. A push by hand would leave
+the branch without a GitHub release, and the installed app would not see the update.
 
 ## Version scheme
 
