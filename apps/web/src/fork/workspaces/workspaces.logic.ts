@@ -127,7 +127,8 @@ export function threadShellKey(thread: Pick<EnvironmentThreadShell, "environment
 
 /**
  * The status of a thread at `now`: upstream's status pill, relabelled as upstream's sidebar does,
- * with Woke when a snooze ended and nothing more urgent shows.
+ * with Woke when a snooze ended and nothing more urgent shows. The pill drops Failed once the
+ * thread is visited; the tab keeps it until the next run, without asking for the user again.
  */
 function resolveTabStatus(
   thread: EnvironmentThreadShell,
@@ -149,7 +150,10 @@ function resolveTabStatus(
     : base?.kind === "working" && pill?.label === "Working" && thread.goal?.status === "active"
       ? { kind: "working", label: "Goal" }
       : base;
-  return resolved === null ? null : { ...resolved, needsYou: NEEDS_YOU_KINDS.has(resolved.kind) };
+  if (resolved !== null) return { ...resolved, needsYou: NEEDS_YOU_KINDS.has(resolved.kind) };
+  return thread.latestRun?.status === "failed"
+    ? { kind: "failed", label: "Failed", needsYou: false }
+    : null;
 }
 
 /** The most urgent of some statuses, or null when none is set. */

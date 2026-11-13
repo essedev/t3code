@@ -75,7 +75,9 @@ New files only, in `apps/web/src/fork/workspaces/`, importing upstream's logic:
 
 - `workspaces.logic.ts`: the pure model. Sections follow upstream's precedence (snoozed, settled,
   pinned); statuses come from `resolveThreadStatusPill` plus upstream's woke check, ranked by
-  upstream's project priority with Woke between Failed and Working.
+  upstream's project priority with Woke between Failed and Working. The pill drops Failed once
+  the thread is visited, like the header dot; the tab keeps it until the next run, out of Needs
+  you, as upstream's sidebar row does.
 - `useWorkspaces.ts`: live data (`useSidebarProjectGroups`, `useQuietThreadShells`), navigation
   and layout edits. Fork settings show an edit right away (`forkSettings.ts`), since upstream's
   settings save is not optimistic and a dropped row would otherwise jump back for a moment.

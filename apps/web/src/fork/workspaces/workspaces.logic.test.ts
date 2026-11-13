@@ -145,6 +145,33 @@ describe("buildWorkspaceSidebarModel", () => {
     expect(workspace.status).toEqual({ kind: "input", label: "Input", needsYou: true });
     expect(workspace.leadTab?.thread.id).toBe("asking");
     expect(model.needsYou.map((tab) => tab.thread.id)).toEqual(["asking"]);
+
+    const failedRun = {
+      status: "failed",
+      completedAt: "2026-11-02T10:00:00.000Z",
+    } as EnvironmentThreadShell["latestRun"];
+    const failing = (lastVisitedAt: string | null) =>
+      buildWorkspaceSidebarModel({
+        projects: [project("relay")],
+        threads: [thread("failing", "relay", { latestRun: failedRun, lastVisitedAt })],
+        lastVisitedAtByKey: {},
+        groups: [],
+        now: NOW,
+      });
+    const unseen = failing("2026-11-02T09:00:00.000Z");
+    expect(unseen.workspaceByKey.get("relay")!.status).toEqual({
+      kind: "failed",
+      label: "Failed",
+      needsYou: true,
+    });
+    // Visiting the thread keeps the failure on the tab but takes it out of Needs you.
+    const seen = failing("2026-11-02T11:00:00.000Z");
+    expect(seen.workspaceByKey.get("relay")!.status).toEqual({
+      kind: "failed",
+      label: "Failed",
+      needsYou: false,
+    });
+    expect(seen.needsYou).toEqual([]);
   });
 
   it("lists pinned, then groups, then the rest, and only workspaces with open tabs", () => {
