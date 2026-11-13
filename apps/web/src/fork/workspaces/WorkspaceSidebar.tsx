@@ -33,13 +33,11 @@ import { useLocalStorage } from "../../hooks/useLocalStorage";
 import {
   resolveShortcutCommand,
   shortcutLabelForCommand,
-  shouldShowThreadJumpHintsForModifiers,
   threadJumpCommandForIndex,
   threadJumpIndexFromCommand,
 } from "../../keybindings";
 import { useThreadJumpHintsVisible } from "../../components/Sidebar.logic";
-import { useTerminalFocus } from "../../hooks/useTerminalFocus";
-import { useShortcutModifierState } from "../../shortcutModifierState";
+import { useThreadRouteTarget } from "../../hooks/useThreadRouteTarget";
 import { readLocalApi } from "../../localApi";
 import { cn, isMacPlatform, randomUUID } from "../../lib/utils";
 import { isTerminalFocused } from "../../lib/terminalFocus";
@@ -556,18 +554,10 @@ function useWorkspaceShortcuts(input: {
  */
 function useWorkspaceJumpHints(workspaces: readonly Workspace[]): ReadonlyMap<string, string> {
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
-  const modifiers = useShortcutModifierState();
-  const terminalFocus = useTerminalFocus();
+  const target = useThreadRouteTarget();
   const visible = useThreadJumpHintsVisible(
-    shouldShowThreadJumpHintsForModifiers(modifiers, keybindings, {
-      platform: navigator.platform,
-      context: {
-        terminalFocus,
-        modelPickerOpen: isModelPickerOpen(),
-        isWeb: !isElectron,
-        isDesktop: isElectron,
-      },
-    }),
+    keybindings,
+    target?.kind === "server" ? target.threadRef : null,
   );
   const hints = new Map<string, string>();
   if (!visible) return hints;

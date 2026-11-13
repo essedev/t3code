@@ -19,7 +19,9 @@ import { restrictToFirstScrollableAncestor, restrictToHorizontalAxis } from "@dn
 import { horizontalListSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { AlarmClockIcon, CheckIcon, ChevronDownIcon, PinIcon, SquarePenIcon } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+
+import { deadlineAfter } from "@t3tools/client-runtime/clock";
 
 import { requestCustomSnooze } from "../../components/CustomSnoozeDialog";
 import { pickSnoozePreset, resolveSnoozePresets } from "../../components/Sidebar.snooze";
@@ -35,7 +37,7 @@ import { useThreadActions } from "../../hooks/useThreadActions";
 import { resolveShortcutCommand, threadTraversalDirectionFromCommand } from "../../keybindings";
 import { readLocalApi } from "../../localApi";
 import { cn } from "../../lib/utils";
-import { isTerminalFocused } from "../../lib/terminalFocus";
+import { isTerminalFocused, subscribeToTerminalFocusChanges } from "../../lib/terminalFocus";
 import { isModelPickerOpen } from "../../modelPickerVisibility";
 import { registerSettleAndAdvance } from "../../settleAndAdvance";
 import { useEnvironmentScope } from "../../state/session";
@@ -46,8 +48,8 @@ import { selectThreadTerminalUiState, useTerminalUiStateStore } from "../../term
 import { useForkSettings } from "../forkSettings";
 import { LocalTabPicker } from "./TabPicker";
 import { ShortcutHint, StatusIcon } from "./WorkspaceParts";
-import { useThreadJumpHintsVisible } from "../../components/Sidebar.logic";
-import { useTerminalFocus } from "../../hooks/useTerminalFocus";
+import { THREAD_JUMP_HINT_SHOW_DELAY_MS } from "../../components/Sidebar.logic";
+import { useDeadlinePassed } from "../../hooks/useDeadline";
 import { isMacPlatform } from "../../lib/utils";
 import { useShortcutModifierState } from "../../shortcutModifierState";
 import {
@@ -119,8 +121,8 @@ function ThreadTabStripContent(props: {
 
   useThreadTabShortcuts({ tabs, activeKey, routeRef: props, onOpen: openThread });
   const modifiers = useShortcutModifierState();
-  const terminalFocus = useTerminalFocus();
-  const showTabHints = useThreadJumpHintsVisible(
+  const terminalFocus = useSyncExternalStore(subscribeToTerminalFocusChanges, isTerminalFocused);
+  const showTabHints = useHeldFor(
     modifiers.altKey &&
       !modifiers.metaKey &&
       !modifiers.ctrlKey &&
@@ -532,4 +534,14 @@ function useThreadTabShortcuts(input: {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [keybindings, terminalOpen, tabs, activeKey, onOpen]);
+}
+
+/** True once `shouldShow` has stayed true for a moment, so a quick shortcut never flashes hints. */
+function useHeldFor(shouldShow: boolean): boolean {
+  const [showAt, setShowAt] = useState<number | null>(null);
+  // The clock is read inside the updater: the compiler caches a bare clock read in render.
+  if (shouldShow !== (showAt !== null)) {
+    setShowAt(shouldShow ? () => deadlineAfter(THREAD_JUMP_HINT_SHOW_DELAY_MS) : null);
+  }
+  return useDeadlinePassed(showAt);
 }
