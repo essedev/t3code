@@ -17,8 +17,8 @@ unchanged. Design and rejected variants: DECISIONS #7 and
   a project) or Go to project away.
 - **Groups**: named cards that collect workspaces, like Relay. Create one from a workspace's
   right-click menu (Move to group > New group) or with `Ctrl+Cmd+G`. Rename, reorder and delete
-  from the group's right-click menu. A group shows only its listed members and
-  hides while none is, except a new empty group, which stays so a workspace can be dragged in.
+  from the group's right-click menu. A group shows only its listed members and hides while none
+  is, except a new empty group, which stays so a workspace can be dragged in.
   Groups sync through server settings (`fork.workspaceGroups`); open or closed is per device. A
   closed group shows the most urgent status among its workspaces.
 - **Unseen activity moves a row up**, as in Relay's sidebar: when a tab starts waiting on you
@@ -46,9 +46,8 @@ unchanged. Design and rejected variants: DECISIONS #7 and
   settles. Settling or snoozing the tab on screen, from any control, the menu or `Cmd+Shift+S`,
   opens the tab to its right (else its left) once the server confirms. Closing the last tab closes
   the workspace too, as in Relay: the next workspace in the sidebar opens (a pinned workspace
-  stays and gets a new thread instead); an
-  auto-settle never moves you. A snoozed or settled thread opened from a list shows as an extra
-  tab until you leave it. The `+N` button lists the
+  stays and gets a new thread instead); an auto-settle never moves you. A snoozed or settled
+  thread opened from a list shows as an extra tab until you leave it. The `+N` button lists the
   workspace's snoozed and settled threads; the pen starts a new thread in the workspace.
 - **Status icons**: upstream's sidebar icons and colours (Working, Waiting, Approval, Input,
   Request, Failed, Woke, Done), plus Plan ready, which upstream's sidebar does not draw.
@@ -83,8 +82,8 @@ New files only, in `apps/web/src/fork/workspaces/`, importing upstream's logic:
   settings save is not optimistic and a dropped row would otherwise jump back for a moment.
 - `WorkspaceSidebar.tsx`, `ThreadTabStrip.tsx`, `GlobalRows.tsx`, `TabPicker.tsx`,
   `WorkspaceParts.tsx`: the UI. Settled reuses upstream's `useOlderSettledShelf` and
-  `useThreadSearch`. Thread actions go
-  through `useThreadActions` and `useThreadActionMenu`, like upstream's rows.
+  `useThreadSearch`. Thread actions go through `useThreadActions` and `useThreadActionMenu`, like
+  upstream's rows.
 
 Upstream files touched: two mount points (`AppSidebarLayout.tsx`, `ChatView.tsx`), listed in the
 README's differences table.

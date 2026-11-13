@@ -17,8 +17,8 @@ one `fork` key (`packages/contracts/src/forkSettings.ts`), saved in the environm
 1. The app's own styles.
 2. `apps/web/src/fork/fork.css`, the fork's defaults, versioned in the repo. Today it raises the
    thread details card to `--glass-opacity: 96%` (the app-wide default is 80%, set by Settings >
-   Appearance > Glass opacity) and drops the rules under a turn's "Working for" and "Worked for" headers and beside the chat's
-   system notes ("Run interrupted").
+   Appearance > Glass opacity) and drops the rules under a turn's "Working for" and "Worked for"
+   headers and beside the chat's system notes ("Run interrupted").
 3. The Custom CSS field, injected last by `ForkStyles` (`apps/web/src/fork/ForkStyles.tsx`).
 
 The two layers stay separate on purpose: a saved editor never changes, so defaults kept in it
