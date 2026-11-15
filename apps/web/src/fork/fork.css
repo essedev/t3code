@@ -18,3 +18,9 @@
 [data-timeline-row-id] span.h-px.flex-1[aria-hidden="true"] {
   visibility: hidden;
 }
+
+/* Side chat header: the thread tab strip beside it is 32px with its tabs at the top, so match both. */
+body:has([data-thread-tab-strip]) [data-side-chat-pane] > div:first-child {
+  height: 2rem;
+  padding-bottom: 0.25rem;
+}
