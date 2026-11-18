@@ -10,7 +10,8 @@ import {
   isThreadWokeUnseen,
   threadWokeAt,
 } from "@t3tools/client-runtime/state/thread-settled";
-import type { ForkWorkspaceGroup } from "@t3tools/contracts";
+import type { OlderSettledScope } from "@t3tools/client-runtime/state/threads";
+import type { EnvironmentId, ForkWorkspaceGroup, ProjectId } from "@t3tools/contracts";
 
 import {
   resolveThreadLastVisitedAt,
@@ -603,6 +604,25 @@ export function searchTabs(
     foldForSearch(`${tab.thread.title} ${workspaceNameOf(tab) ?? ""}`).includes(folded);
   const titled = tabs.filter(byText);
   return [...titled, ...tabs.filter((tab) => !byText(tab) && matchedKeys.has(tab.key))];
+}
+
+/** The sidebar's projects per environment: older settled threads load and search only for those. */
+export function settledScopes(model: WorkspaceSidebarModel): OlderSettledScope[] {
+  const byEnvironment = new Map<EnvironmentId, ProjectId[]>();
+  for (const workspace of model.workspaces) {
+    for (const ref of workspace.project.memberProjectRefs) {
+      const ids = byEnvironment.get(ref.environmentId) ?? [];
+      ids.push(ref.projectId);
+      byEnvironment.set(ref.environmentId, ids);
+    }
+  }
+  // Sorted, as they key the search: mounting its older threads reorders the sidebar.
+  return [...byEnvironment]
+    .toSorted(([left], [right]) => left.localeCompare(right))
+    .map(([environmentId, projectIds]) => ({
+      environmentId,
+      projectIds: projectIds.toSorted((left, right) => left.localeCompare(right)),
+    }));
 }
 
 /** Groups with a new empty group appended. */

@@ -4,7 +4,6 @@
  * keeps only the newest settled ones, and searches them through the server's thread search.
  */
 import type { OlderSettledScope } from "@t3tools/client-runtime/state/threads";
-import type { EnvironmentId, ProjectId } from "@t3tools/contracts";
 import { AlarmClockIcon, BellDotIcon, CheckCheckIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
@@ -17,6 +16,7 @@ import { useThreadSearch } from "../../state/queries";
 import { LocalTabPicker, TabPicker } from "./TabPicker";
 import {
   searchTabs,
+  settledScopes,
   threadShellKey,
   type WorkspaceSidebarModel,
   type WorkspaceTab,
@@ -24,19 +24,6 @@ import {
 
 // Upstream's Settled shelf grows by the same step.
 const SETTLED_PAGE_SIZE = 25;
-
-/** The sidebar's projects per environment: older settled threads load only for those. */
-function settledScopes(model: WorkspaceSidebarModel): OlderSettledScope[] {
-  const byEnvironment = new Map<EnvironmentId, ProjectId[]>();
-  for (const workspace of model.workspaces) {
-    for (const ref of workspace.project.memberProjectRefs) {
-      const ids = byEnvironment.get(ref.environmentId) ?? [];
-      ids.push(ref.projectId);
-      byEnvironment.set(ref.environmentId, ids);
-    }
-  }
-  return [...byEnvironment].map(([environmentId, projectIds]) => ({ environmentId, projectIds }));
-}
 
 /** The three rows, each opening a searchable list to the right of the sidebar. */
 export function GlobalRows(props: { readonly model: WorkspaceSidebarModel }) {

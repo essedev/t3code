@@ -15,6 +15,7 @@ import {
   renameWorkspaceGroup,
   reorderTabs,
   searchTabs,
+  settledScopes,
   tabAfterClosing,
   workspaceAfterClosing,
 } from "./workspaces.logic";
@@ -334,6 +335,24 @@ describe("workspace bump on unseen activity", () => {
     });
     expect(bumpWorkspace({ groups, workspaceOrder: ["y"], key: "y", pinned: false })).toBeNull();
     expect(bumpWorkspace({ groups, workspaceOrder: [], key: "z", pinned: true })).toBeNull();
+  });
+});
+
+describe("settledScopes", () => {
+  // The scopes key the Settled search: a key that follows the sidebar's activity order changes
+  // when the search mounts older threads, which reorders the sidebar, in a render loop.
+  it("does not depend on the sidebar's project order", () => {
+    const modelOf = (keys: string[]) =>
+      buildWorkspaceSidebarModel({
+        projects: keys.map((key) => project(key)),
+        threads: [],
+        lastVisitedAtByKey: {},
+        groups: [],
+        now: NOW,
+      });
+    expect(settledScopes(modelOf(["b", "a", "c"]))).toEqual(
+      settledScopes(modelOf(["c", "b", "a"])),
+    );
   });
 });
 
