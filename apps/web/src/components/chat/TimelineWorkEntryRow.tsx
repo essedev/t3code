@@ -31,7 +31,8 @@ import {
   workLogEntryIsToolLike,
 } from "../../session-logic";
 import ChatMarkdown from "../ChatMarkdown";
-import { ChatMarkdownAssetImage } from "./ChatMarkdownMedia";
+import { ViewedImage } from "~/fork/ViewedImage";
+import { viewedImageOutput } from "~/fork/viewedImages";
 import { ChevronRightIcon, CircleAlertIcon, XIcon, RotateCcwIcon } from "lucide-react";
 import { Button, InlineButton } from "../ui/button";
 import { useAssetUrls } from "../../assets/assetUrls";
@@ -181,14 +182,15 @@ export function ViewedImagesTimelineRow({
   if (!threadRef) return null;
   return (
     <div className="flex flex-wrap items-start gap-2 px-0.5">
-      {row.paths.map((path) => {
+      {row.paths.map((path, index) => {
         const image = resolveViewedImageAsset(path, {
           threadId: threadRef.threadId,
           workspaceRoot,
         });
         return image ? (
-          <ChatMarkdownAssetImage
+          <ViewedImage
             key={path}
+            output={row.outputs[index] ?? null}
             environmentId={threadRef.environmentId}
             resource={image.resource}
             alt={image.alt}
@@ -545,7 +547,8 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
     >
       {expanded && viewedImage && threadRef ? (
         <WorkLogDetails kind="media">
-          <ChatMarkdownAssetImage
+          <ViewedImage
+            output={viewedImageOutput(workEntry.structuredPayload)}
             environmentId={threadRef.environmentId}
             resource={viewedImage.resource}
             alt={viewedImage.alt}

@@ -68,6 +68,7 @@ import type { ThreadRunSummary } from "@t3tools/client-runtime/state/shell";
 import type { ToolCallVisibility } from "@t3tools/contracts/settings";
 import { resolveT3McpToolDefinition } from "@t3tools/shared/t3McpToolPresentation";
 import { compactDynamicToolOutput } from "@t3tools/shared/toolOutput";
+import { type ViewedImageOutput, viewedImageOutputs } from "~/fork/viewedImages";
 import { htmlRenderReferencesEqual, type HtmlRenderReference } from "@t3tools/shared/htmlRender";
 import { mcpAppReferencesEqual, type McpAppReference } from "@t3tools/shared/mcpApp";
 import { dynamicToolTitle } from "@t3tools/shared/toolActivity";
@@ -556,6 +557,8 @@ type MessagesTimelineRowContent =
       id: string;
       createdAt: string;
       paths: ReadonlyArray<string>;
+      /** Saved copy of each path's image, shown when its file is gone. */
+      outputs: ReadonlyArray<ViewedImageOutput | null>;
     }
   | {
       kind: "turn-fold";
@@ -678,7 +681,15 @@ function viewedImagesRows(
   const paths = workEntriesViewedImagePaths(groupedEntries);
   return paths.length === 0
     ? []
-    : [{ kind: "viewed-images", id: `${groupId}:viewed-images`, createdAt, paths }];
+    : [
+        {
+          kind: "viewed-images",
+          id: `${groupId}:viewed-images`,
+          createdAt,
+          paths,
+          outputs: viewedImageOutputs(groupedEntries, paths),
+        },
+      ];
 }
 
 export function resolveAssistantMessageCopyState({
@@ -2608,7 +2619,8 @@ function isRowUnchanged(a: MessagesTimelineRow, b: MessagesTimelineRow): boolean
       return (
         a.createdAt === bv.createdAt &&
         a.paths.length === bv.paths.length &&
-        a.paths.every((path, index) => path === bv.paths[index])
+        a.paths.every((path, index) => path === bv.paths[index]) &&
+        a.outputs.every((output, index) => output?.itemId === bv.outputs[index]?.itemId)
       );
     }
 

@@ -33,6 +33,10 @@ file lacks "fork" in its path.
 - `apps/web/src/components/ChatMarkdown.tsx`: "Open in system browser" on chat file links.
 - `apps/web/src/components/ChatView.tsx`: mounts the thread tab strip under the chat header.
 - `apps/web/src/components/chat/MarkdownFileLink.tsx`: the menu item of that action.
+- `apps/web/src/components/chat/MessagesTimeline.logic.ts`: the viewed-images row carries each
+  image's saved copy from `fork/viewedImages.ts`.
+- `apps/web/src/components/chat/TimelineWorkEntryRow.tsx`: viewed images render through
+  `fork/ViewedImage.tsx`.
 - `apps/web/src/components/settings/SettingsSidebarNav.tsx`: icon of the Fork settings page.
 - `apps/web/src/components/settings/settingsSearch.ts`: Fork settings page and its search entries.
 - `apps/web/src/fileContextMenu.ts`: "Open in system browser" in the file tree and diff menus.
