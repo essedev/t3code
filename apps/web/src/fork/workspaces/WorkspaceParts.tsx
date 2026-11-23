@@ -21,16 +21,17 @@ import type { TabStatus, TabStatusKind } from "./workspaces.logic";
 
 // Upstream's sidebar icons and colours per state (`TOP_STATUS_ICONS` in
 // components/sidebar/SidebarThreadRow.tsx), copied so the upstream file stays untouched.
+// Waiting and Plan ready swap colours: Waiting reads apart from idle grey.
 const STATUS_ICONS: Record<
   TabStatusKind,
   { readonly icon: LucideIcon; readonly className: string }
 > = {
   working: { icon: CircleDashedIcon, className: "text-info-foreground" },
-  waiting: { icon: CircleDotDashedIcon, className: "text-muted-foreground" },
+  waiting: { icon: CircleDotDashedIcon, className: "text-violet-600 dark:text-violet-300" },
   approval: { icon: ShieldQuestionIcon, className: "text-warning-foreground" },
   input: { icon: MessageCircleQuestionIcon, className: "text-indigo-600 dark:text-indigo-300" },
   request: { icon: UserRoundIcon, className: "text-guest-foreground" },
-  plan: { icon: ListTodoIcon, className: "text-violet-600 dark:text-violet-300" },
+  plan: { icon: ListTodoIcon, className: "text-muted-foreground" },
   failed: { icon: CircleAlertIcon, className: "text-error-foreground" },
   woke: { icon: AlarmClockIcon, className: "text-warning-foreground" },
   done: { icon: CircleCheckIcon, className: "text-success-foreground" },

@@ -50,7 +50,8 @@ unchanged. Design and rejected variants: DECISIONS #7 and
   thread opened from a list shows as an extra tab until you leave it. The `+N` button lists the
   workspace's snoozed and settled threads; the pen starts a new thread in the workspace.
 - **Status icons**: upstream's sidebar icons and colours (Working, Waiting, Approval, Input,
-  Request, Failed, Woke, Done), plus Plan ready, which upstream's sidebar does not draw.
+  Request, Failed, Woke, Done), plus Plan ready, which upstream's sidebar does not draw. Waiting is
+  violet and Plan ready grey, so Waiting stands apart from an idle row.
 - **Unsent drafts**: upstream's pen marks a tab, a workspace row and a list entry whose thread has
   text or attachments typed and not sent, except the thread on screen. A draft of a thread not
   created yet shows only while its page is open.
