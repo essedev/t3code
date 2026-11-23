@@ -61,7 +61,8 @@ file lacks "fork" in its path.
 2. Rust 1.95 or newer (`rustup update stable`); the resource monitor's dependencies require it.
 3. `bash fork/setup-signing.sh`. It creates the "T3 Code Fork Self-Signed" identity in a dedicated
    keychain under `~/.t3-fork/codesign` and prints one `sudo` command to trust it for code signing.
-4. `gh auth switch --user essedev`.
+4. `gh` logged in as essedev (`gh auth login`); `release.sh` uses its token whatever account
+   is active.
 
 ## Releasing
 

@@ -20,7 +20,11 @@ fail() {
 dry_run=false
 [ "${1:-}" = "--dry-run" ] && dry_run=true
 $dry_run || [ -z "$(git status --porcelain)" ] || fail "the working tree is not clean"
-[ "$(gh api user -q .login)" = "essedev" ] || fail "gh must be on essedev: gh auth switch --user essedev"
+# gh falls back to another active account on its own, so essedev's token is pinned for the whole
+# run: gh, and git through gh's credential helper, keep using it whatever the active account.
+GH_TOKEN="$(gh auth token --user essedev 2>/dev/null)" || fail "gh has no essedev login: gh auth login"
+export GH_TOKEN
+[ "$(gh api user -q .login)" = "essedev" ] || fail "the essedev token does not authenticate as essedev"
 bash fork/setup-signing.sh >/dev/null || fail "signing identity not ready, run fork/setup-signing.sh"
 
 git fetch origin --tags --quiet
@@ -140,7 +144,9 @@ grep -q "repo: t3code" "$app/Contents/Resources/app-update.yml" &&
 
 git tag -a "$tag" -m "T3 Code fork $version"
 # Rebasing on a new upstream base rewrites the branch, so a plain push is rejected.
-git push --force-with-lease origin "$BRANCH" "$tag"
+# A failed push drops the local tag, or the next run would stop at "already released".
+git push --force-with-lease origin "$BRANCH" "$tag" ||
+  { git tag -d "$tag" >/dev/null; fail "push failed, fix the cause and run it again"; }
 gh release create "$tag" --repo "$REPO_SLUG" --latest \
   --title "T3 Code fork $version" \
   --notes "Fork release on top of upstream $base_tag.
