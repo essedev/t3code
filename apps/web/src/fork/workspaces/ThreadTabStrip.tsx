@@ -30,6 +30,7 @@ import { Popover, PopoverPopup, PopoverTrigger } from "../../components/ui/popov
 import { toastManager } from "../../components/ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../../components/ui/tooltip";
 import { isCommandPaletteOpen } from "../../commandPaletteBus";
+import { useThreadHasUnsentDraft } from "../../composerDraftStore";
 import { isElectron } from "../../env";
 import { useClientSettings } from "../../hooks/useSettings";
 import { useThreadActionMenu } from "../../hooks/useThreadActionMenu";
@@ -47,7 +48,7 @@ import { useOrchestrationCommand } from "../../state/use-orchestration-command";
 import { selectThreadTerminalUiState, useTerminalUiStateStore } from "../../terminalUiStateStore";
 import { useForkSettings } from "../forkSettings";
 import { LocalTabPicker } from "./TabPicker";
-import { ShortcutHint, StatusIcon } from "./WorkspaceParts";
+import { DraftIndicator, ShortcutHint, StatusIcon } from "./WorkspaceParts";
 import { THREAD_JUMP_HINT_SHOW_DELAY_MS } from "../../components/Sidebar.logic";
 import { useDeadlinePassed } from "../../hooks/useDeadline";
 import { isMacPlatform } from "../../lib/utils";
@@ -314,6 +315,7 @@ function ThreadTab(props: {
   const thread = tab.thread;
   const threadRef = scopeThreadRef(thread.environmentId, thread.id);
   const [renaming, setRenaming] = useState(false);
+  const hasUnsentDraft = useThreadHasUnsentDraft(threadRef) && !active;
   const tabRef = useRef<HTMLDivElement>(null);
   const { listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: tab.key,
@@ -424,6 +426,7 @@ function ThreadTab(props: {
         <PinIcon aria-label="Pinned" className="size-3 shrink-0 text-muted-foreground" />
       ) : null}
       <StatusIcon status={tab.status} />
+      {hasUnsentDraft ? <DraftIndicator /> : null}
       {renaming ? (
         <input
           autoFocus

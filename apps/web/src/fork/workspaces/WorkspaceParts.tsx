@@ -8,10 +8,14 @@ import {
   ListTodoIcon,
   MessageCircleQuestionIcon,
   ShieldQuestionIcon,
+  SquarePenIcon,
   UserRoundIcon,
   type LucideIcon,
 } from "lucide-react";
 
+import { draftPenClassName } from "../../components/sidebar/SidebarThreadRow";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../../components/ui/tooltip";
+import { composerDraftHasUserContent, useComposerDraftStore } from "../../composerDraftStore";
 import { cn } from "../../lib/utils";
 import type { TabStatus, TabStatusKind } from "./workspaces.logic";
 
@@ -51,6 +55,37 @@ export function StatusIcon(props: {
       aria-label={status.label}
       className={cn("size-3.5 shrink-0", className, props.className)}
     />
+  );
+}
+
+/** Upstream's pen for an unsent draft, with its tooltip. */
+export function DraftIndicator(props: { readonly label?: string }) {
+  const label = props.label ?? "Unsent draft";
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <span role="img" aria-label={label} className="inline-flex shrink-0 items-center" />
+        }
+      >
+        <SquarePenIcon aria-hidden className={draftPenClassName} />
+      </TooltipTrigger>
+      <TooltipPopup side="top">{label}</TooltipPopup>
+    </Tooltip>
+  );
+}
+
+/** Whether a thread among `threadKeys`, other than `exceptKey`, has an unsent draft. */
+export function useHasUnsentDraftAmong(
+  threadKeys: ReadonlySet<string>,
+  exceptKey: string | null,
+): boolean {
+  // Walks the drafts, a handful, rather than the threads: settled ones can run into hundreds.
+  return useComposerDraftStore((state) =>
+    Object.entries(state.draftsByThreadKey).some(
+      ([key, draft]) =>
+        key !== exceptKey && threadKeys.has(key) && composerDraftHasUserContent(draft),
+    ),
   );
 }
 

@@ -15,9 +15,11 @@ import {
   CommandItem,
   CommandList,
 } from "../../components/ui/command";
+import { useThreadHasUnsentDraft } from "../../composerDraftStore";
 import { useThreadActions } from "../../hooks/useThreadActions";
+import { useThreadRouteRef } from "../../hooks/useThreadRouteTarget";
 import { formatRelativeTimeLabel } from "../../timestampFormat";
-import { StatusIcon } from "./WorkspaceParts";
+import { DraftIndicator, StatusIcon } from "./WorkspaceParts";
 import { reportThreadAction, useWorkspaceNavigation } from "./useWorkspaces";
 import { searchTabs, type WorkspaceTab } from "./workspaces.logic";
 
@@ -122,6 +124,10 @@ function TabPickerItem(props: {
   const { openThread } = useWorkspaceNavigation();
   const { unsnoozeThread, unsettleThread } = useThreadActions();
   const ref = scopeThreadRef(tab.thread.environmentId, tab.thread.id);
+  const routeRef = useThreadRouteRef();
+  const isRouteThread =
+    routeRef?.environmentId === ref.environmentId && routeRef.threadId === ref.threadId;
+  const hasUnsentDraft = useThreadHasUnsentDraft(ref) && !isRouteThread;
   const detail = [kind === "needs-you" ? tab.status?.label : null, props.workspaceName]
     .filter(Boolean)
     .join(" · ");
@@ -159,6 +165,7 @@ function TabPickerItem(props: {
         <span className="truncate">{tab.thread.title || "Untitled thread"}</span>
         {detail ? <span className="truncate text-xs text-muted-foreground">{detail}</span> : null}
       </span>
+      {hasUnsentDraft ? <DraftIndicator /> : null}
       {when ? (
         <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{when}</span>
       ) : null}

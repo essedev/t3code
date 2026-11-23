@@ -45,7 +45,13 @@ import { isModelPickerOpen } from "../../modelPickerVisibility";
 import { primaryServerKeybindingsAtom } from "../../state/server";
 import { toastManager } from "../../components/ui/toast";
 import { GlobalRows } from "./GlobalRows";
-import { ShortcutHint, StatusIcon, statusColorClass } from "./WorkspaceParts";
+import {
+  DraftIndicator,
+  ShortcutHint,
+  StatusIcon,
+  statusColorClass,
+  useHasUnsentDraftAmong,
+} from "./WorkspaceParts";
 import {
   useRouteWorkspaceRef,
   useWorkspaceLayoutEditor,
@@ -213,6 +219,7 @@ export function WorkspaceSidebar() {
   const rowProps = {
     jumpHints,
     activeWorkspaceKey,
+    activeThreadKey: route.threadKey,
     groups: layout.groups,
     onCreateGroup: createGroup,
   };
@@ -729,6 +736,8 @@ interface WorkspaceRowProps {
   /** `Cmd+N` labels shown while the modifier is held, by workspace key. */
   readonly jumpHints: ReadonlyMap<string, string>;
   readonly activeWorkspaceKey: string | null;
+  /** The thread on screen, whose draft is the one being typed and gets no pen. */
+  readonly activeThreadKey: string | null;
   readonly groups: ReturnType<typeof useWorkspaceLayoutEditor>["groups"];
   readonly onCreateGroup: (projectKey: string) => void;
 }
@@ -749,6 +758,12 @@ function WorkspaceRow(props: WorkspaceRowProps) {
   const active = props.activeWorkspaceKey === workspace.key;
   const openCount = workspace.openTabs.length;
   const jumpHint = props.jumpHints.get(workspace.key) ?? null;
+  const threadKeys = new Set(
+    [...workspace.openTabs, ...workspace.snoozedTabs, ...workspace.settledTabs].map(
+      (tab) => tab.key,
+    ),
+  );
+  const hasUnsentDraft = useHasUnsentDraftAmong(threadKeys, props.activeThreadKey);
   const currentGroupId =
     props.groups.find((group) => group.projectKeys.includes(workspace.key))?.id ?? null;
 
@@ -860,6 +875,7 @@ function WorkspaceRow(props: WorkspaceRowProps) {
             <span className="min-w-0 flex-1 truncate text-sm font-medium">
               {project.displayName}
             </span>
+            {hasUnsentDraft ? <DraftIndicator label="Unsent draft in this workspace" /> : null}
             <StatusIcon status={workspace.status} />
             {openCount > 0 && jumpHint === null ? (
               <span className="shrink-0 text-xs tabular-nums text-sidebar-muted-foreground group-hover/workspace:invisible pointer-coarse:invisible">
