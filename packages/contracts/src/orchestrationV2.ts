@@ -3082,6 +3082,12 @@ export const OrchestrationV2Command = Schema.Union([
     commandId: CommandId,
     threadId: ThreadId,
   }),
+  /** Turns a side chat into a listed fork of its parent, keeping its conversation. */
+  Schema.Struct({
+    type: Schema.Literal("thread.side-chat.promote"),
+    commandId: CommandId,
+    threadId: ThreadId,
+  }),
   Schema.Struct({
     type: Schema.Literal("thread.metadata.update"),
     commandId: CommandId,

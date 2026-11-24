@@ -114,6 +114,7 @@ import {
 import { CommandReceiptStoreV2, type CommandReceiptV2 } from "./CommandReceiptStore.ts";
 import {
   ContextHandoffServiceV2,
+  isSideChatContextHandoff,
   readForkHistoryItems,
   readInheritedHandoffItems,
   visibleConversationItems,
@@ -605,6 +606,7 @@ function commandThreadId(command: OrchestrationV2ServerCommand): ThreadId {
     case "thread.tag.set":
     case "thread.visit":
     case "thread.mark-unread":
+    case "thread.side-chat.promote":
     case "thread.metadata.update":
     case "thread.pull-request.link":
     case "thread.pull-request.unlink":
@@ -4807,6 +4809,62 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       providerInstanceId: thread.providerInstanceId,
       occurredAt: now,
       payload: { ...thread, projectId: command.projectId, worktreePath: null, updatedAt: now },
+    });
+  });
+
+  // Dropping the flag is the whole change: listing, search and the parent's delete cascade all
+  // read it, and the thread already is a fork of its parent in the same worktree.
+  const dispatchSideChatPromote = Effect.fn("orchestrationV2.dispatch.sideChatPromote")(function* (
+    command: Extract<OrchestrationV2ServerCommand, { readonly type: "thread.side-chat.promote" }>,
+    events: Ref.Ref<Array<OrchestrationV2DomainEvent>>,
+  ) {
+    const reject = (cause: string) =>
+      new OrchestratorDispatchError({
+        commandId: command.commandId,
+        commandType: command.type,
+        cause: `Thread ${command.threadId} ${cause}`,
+      });
+    const projection = yield* projectionStore
+      .getThreadRecords(
+        command.threadId,
+        ["runs", "runtimeRequests", "contextTransfers", "contextHandoffs"],
+        { turnItemTypes: [] },
+      )
+      .pipe(
+        Effect.mapError(
+          (cause) => new OrchestratorProjectionError({ threadId: command.threadId, cause }),
+        ),
+      );
+    const thread = projection.thread;
+    if (thread.deletedAt !== null) return yield* reject("is deleted.");
+    if (thread.lineage.sideChat !== true) return yield* reject("is not a side chat.");
+    // A running turn reads the flag again when it captures its checkpoint.
+    if (threadHasUnfinishedWork(projection)) {
+      return yield* reject("still has work in progress. Wait for it to finish or stop it.");
+    }
+    // Until a turn delivers the parent's context, the thread still needs side chat handling.
+    if (
+      pendingForkTransferForThread(projection) !== undefined ||
+      projection.contextHandoffs.some(
+        (handoff) =>
+          isSideChatContextHandoff(handoff) &&
+          handoff.status === "ready" &&
+          handoff.delivery === undefined,
+      )
+    ) {
+      return yield* reject("has not had a reply yet. Send it a message first.");
+    }
+    const { sideChat: _sideChat, ...lineage } = thread.lineage;
+    const now = yield* DateTime.now;
+    yield* emit(
+      events,
+      command,
+    )({
+      type: "thread.metadata-updated",
+      threadId: command.threadId,
+      providerInstanceId: thread.providerInstanceId,
+      occurredAt: now,
+      payload: { ...thread, lineage, updatedAt: now },
     });
   });
 
@@ -13726,6 +13784,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       case "thread.project.adopt-folder":
         yield* dispatchThreadProjectAdoptFolder(command, events);
         break;
+      case "thread.side-chat.promote":
+        yield* dispatchSideChatPromote(command, events);
+        break;
       case "message.dispatch": {
         // Providers own native subagent conversations; messages cannot target them, and adapters ask questions on the parent.
         const thread = yield* projectionStore
@@ -14282,6 +14343,15 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       return yield* source === null || source.lineage.sideChat === true || target !== null
         ? dispatch
         : threadDispatch.withLock(command.sourceThreadId, dispatch);
+    }
+    // The delete cascade reads its side chats under the parent's lock, so a promotion takes it too.
+    if (command.type === "thread.side-chat.promote") {
+      const thread = yield* findThread(command.threadId);
+      const parentThreadId =
+        thread?.lineage.sideChat === true ? thread.lineage.parentThreadId : null;
+      return yield* parentThreadId === null
+        ? dispatch
+        : threadDispatch.withLock(parentThreadId, dispatch);
     }
     if (command.type === "thread.delete")
       return yield* threadDispatch.withLock(

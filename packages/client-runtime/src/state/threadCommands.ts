@@ -33,6 +33,7 @@ import {
   markThreadUnread,
   mergeThreadBack,
   promoteQueuedRun,
+  promoteSideChat,
   resumeThreadQueue,
   retryWorkspacePreparation,
   linkThreadPullRequest,
@@ -334,6 +335,12 @@ export function createThreadEnvironmentAtoms<R, E>(
         key: ({ environmentId, input }) =>
           JSON.stringify([environmentId, input.sourceThreadId, input.targetThreadId]),
       },
+    }),
+    promoteSideChat: createEnvironmentCommand(runtime, {
+      label: "environment-data:commands:thread:promote-side-chat",
+      execute: promoteSideChat,
+      scheduler,
+      concurrency,
     }),
     resumeThreadQueue: createEnvironmentCommand(runtime, {
       label: "environment-data:commands:thread:resume-queue",

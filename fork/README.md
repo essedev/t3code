@@ -25,6 +25,14 @@ fork adds need no row: they cannot conflict, and they carry "fork" in their path
 file lacks "fork" in its path.
 
 - `apps/desktop/src/boot.ts`: telemetry and OpenTelemetry export off by default (DECISIONS #5).
+- `apps/server/src/environment/ServerEnvironment.ts`: advertises `sideChatPromotion`
+  ([side chat promotion](features/side-chat-promotion.md), DECISIONS #10).
+- `apps/server/src/orchestration-v2/Orchestrator.ts`: the `thread.side-chat.promote` command and
+  its parent lock.
+- `apps/server/src/orchestration-v2/runtimeLayer.test.ts`: a promotion waits for the parent's lock.
+- `apps/server/src/orchestration-v2/SteeringCompletion.integration.test.ts`: promotion over real
+  turns.
+- `apps/server/src/orchestration-v2/testkit/OrchestratorScenario.ts`: routes the new command.
 - `apps/server/src/process/externalLauncher.ts`: mounts `forkSystemBrowser.ts` for the
   `systemBrowser` launch.
 - `apps/server/src/project/ProjectFaviconResolver.ts`: when the root has no icon, tries the subfolders
@@ -37,14 +45,20 @@ file lacks "fork" in its path.
   image's saved copy from `fork/viewedImages.ts`.
 - `apps/web/src/components/chat/TimelineWorkEntryRow.tsx`: viewed images render through
   `fork/ViewedImage.tsx`.
+- `apps/web/src/components/chat/SideChatPane.tsx`: the "Make main thread" button.
 - `apps/web/src/components/settings/SettingsSidebarNav.tsx`: icon of the Fork settings page.
 - `apps/web/src/components/settings/settingsSearch.ts`: Fork settings page and its search entries.
 - `apps/web/src/fileContextMenu.ts`: "Open in system browser" in the file tree and diff menus.
 - `apps/web/src/routeTree.gen.ts`: generated; on a conflict take upstream's and run `vp run dev`
   once to regenerate it with the fork's settings route.
 - `apps/web/src/routes/_chat.tsx`: mounts `ForkStyles` (`fork.css` and the custom CSS).
+- `docs/user/thread-sidebar.md`: "Make main thread" in the side chats section.
+- `packages/client-runtime/src/operations/commands.ts`: `promoteSideChat`.
+- `packages/client-runtime/src/state/threadCommands.ts`: its `promoteSideChat` command atom.
 - `packages/contracts/src/editor.ts`: the `systemBrowser` flag of the launch input.
+- `packages/contracts/src/environment.ts`: the `sideChatPromotion` capability.
 - `packages/contracts/src/index.ts`: exports `forkSettings.ts`.
+- `packages/contracts/src/orchestrationV2.ts`: the `thread.side-chat.promote` command schema.
 - `packages/contracts/src/settings.ts`: the `fork` key in server settings and their patch.
 - `CLAUDE.md`: imports this README.
 

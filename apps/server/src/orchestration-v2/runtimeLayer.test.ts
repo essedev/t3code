@@ -859,6 +859,103 @@ it.layer(layerProjectDeletionTest)("project deletion during thread commands", (i
       }).pipe(Effect.ensuring(Effect.sync(() => lockSpy.mockRestore())));
     }),
   );
+
+  // The cascade reads its side chats under the parent's lock; a promotion committed between that
+  // read and the side chat's lock would be deleted as a side chat.
+  it.effect("a side chat promotion waits for its parent's lock", () =>
+    Effect.gen(function* () {
+      const projects = yield* ProjectService.ProjectService;
+      const orchestrator = yield* Orchestrator.OrchestratorV2;
+      const executor = yield* ThreadCommandExecutor.ThreadCommandExecutor;
+      const projectId = ProjectId.make("runtime-side-chat-promote-lock");
+      const parentId = ThreadId.make("runtime-side-chat-promote-lock-parent");
+      const sideChatId = ThreadId.make("runtime-side-chat-promote-lock-child");
+      yield* projects.create({
+        commandId: CommandId.make("runtime-side-chat-promote-lock-project"),
+        projectId,
+        title: "Side chat promotion lock",
+        workspaceRoot: "/work/side-chat-promote-lock",
+      });
+      yield* orchestrator.dispatch({
+        type: "thread.create",
+        commandId: CommandId.make("runtime-side-chat-promote-lock-create"),
+        createdBy: "user",
+        creationSource: "web",
+        threadId: parentId,
+        projectId,
+        title: "Parent",
+        modelSelection,
+        runtimeMode: "full-access",
+        interactionMode: "default",
+        branch: null,
+        worktreePath: null,
+      });
+      yield* orchestrator.dispatch({
+        type: "thread.fork",
+        commandId: CommandId.make("runtime-side-chat-promote-lock-fork"),
+        sourceThreadId: parentId,
+        targetThreadId: sideChatId,
+        sourcePoint: { type: "latest_stable" },
+        sideChat: true,
+        createdBy: "user",
+        creationSource: "web",
+      });
+
+      const deleteHoldsParent = yield* Deferred.make<void>();
+      const releaseDelete = yield* Deferred.make<void>();
+      const promoteWaitsForParent = yield* Deferred.make<void>();
+      const withLock = executor.withLock;
+      let parentLockRequests = 0;
+      const observeLock: ThreadCommandExecutor.ThreadCommandExecutor["Service"]["withLock"] = (
+        key,
+        effect,
+      ) => {
+        if (key !== parentId) return withLock(key, effect);
+        return Effect.suspend(() =>
+          ++parentLockRequests === 1
+            ? withLock(
+                key,
+                Deferred.succeed(deleteHoldsParent, undefined).pipe(
+                  Effect.andThen(Deferred.await(releaseDelete)),
+                  Effect.andThen(effect),
+                ),
+              )
+            : Deferred.succeed(promoteWaitsForParent, undefined).pipe(
+                Effect.andThen(withLock(key, effect)),
+              ),
+        );
+      };
+      const lockSpy = vi.spyOn(executor, "withLock").mockImplementation(observeLock);
+      yield* Effect.gen(function* () {
+        const deleteFiber = yield* orchestrator
+          .dispatch({
+            type: "thread.delete",
+            commandId: CommandId.make("runtime-side-chat-promote-lock-delete"),
+            threadId: parentId,
+          })
+          .pipe(Effect.forkChild({ startImmediately: true }));
+        yield* Deferred.await(deleteHoldsParent);
+        const promoteFiber = yield* orchestrator
+          .dispatch({
+            type: "thread.side-chat.promote",
+            commandId: CommandId.make("runtime-side-chat-promote-lock-promote"),
+            threadId: sideChatId,
+          })
+          .pipe(Effect.flip, Effect.forkChild({ startImmediately: true }));
+        yield* Effect.raceFirst(
+          Deferred.await(promoteWaitsForParent),
+          Fiber.join(promoteFiber).pipe(
+            Effect.andThen(Effect.die("The promotion bypassed the parent's lock.")),
+          ),
+        );
+        yield* Deferred.succeed(releaseDelete, undefined);
+        yield* Fiber.join(deleteFiber);
+        const refused = yield* Fiber.join(promoteFiber);
+        assert.include(String(refused.cause), "is deleted");
+        assert.isNotNull((yield* orchestrator.getThreadProjection(sideChatId)).thread.deletedAt);
+      }).pipe(Effect.ensuring(Effect.sync(() => lockSpy.mockRestore())));
+    }),
+  );
 });
 
 const layerSharedApplicationDataPlaneTest = Layer.mergeAll(

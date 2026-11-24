@@ -90,3 +90,17 @@ rules still win. Rejected: seeding the defaults into the Custom CSS field, becau
 never changes, so new defaults would stop arriving with releases and a copied rule whose selector
 upstream renames would break silently. A rule that proves itself in the editor moves into
 `fork.css` with a commit. Detail: `features/fork-settings.md`.
+
+## 10. Side chat promotion changes upstream server code, as a candidate for upstream
+
+Status: active (2026-11-24)
+
+"Make main thread" turns a side chat into a listed thread by dropping `lineage.sideChat`: the
+thread already is a fork of its parent in the same worktree, and listing, search and the parent's
+delete cascade all read that flag. It needs a command in contracts and the orchestrator, so it
+breaks #8's mount-point rule; the code is written as an upstream change and the exception ends
+if upstream takes it. The command emits the existing `thread.metadata-updated` event and adds no
+migration, so the database stays readable by the official app (#6). Rejected: a client-only fork
+of the side chat into a new thread, which duplicates the conversation, passes the provider context
+as a summary when the provider cannot fork natively, and leaves the copy pointing at a hidden
+parent. Detail: `features/side-chat-promotion.md`.

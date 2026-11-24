@@ -2648,3 +2648,122 @@ it.effect("a side chat that opens with /goal gets its context on the next questi
     }),
   ),
 );
+
+it.effect("a side chat becomes a listed thread once its context reached the agent", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const { events, layer, started, startFirstTurn } = yield* goalHarness("side-chat-promote");
+      yield* Effect.gen(function* () {
+        const orchestrator = yield* Orchestrator.OrchestratorV2;
+        const worker = yield* EffectWorker.OrchestrationEffectWorkerV2;
+        const parentId = yield* startFirstTurn;
+        const sideChatId = ThreadId.make("thread:side-chat-promote-child");
+        yield* orchestrator.dispatch({
+          type: "thread.fork",
+          commandId: CommandId.make("side-chat-promote-fork"),
+          sourceThreadId: parentId,
+          targetThreadId: sideChatId,
+          sourcePoint: { type: "latest_stable" },
+          sideChat: true,
+          createdBy: "user",
+          creationSource: "web",
+        });
+        const promote = (id: string, threadId = sideChatId) =>
+          orchestrator.dispatch({
+            type: "thread.side-chat.promote",
+            commandId: CommandId.make(id),
+            threadId,
+          });
+        const refusal = (id: string, threadId = sideChatId) =>
+          promote(id, threadId).pipe(
+            Effect.flip,
+            Effect.map((error) => String(error.cause)),
+          );
+        const ask = (id: string, text: string) =>
+          orchestrator.dispatch({
+            type: "message.dispatch",
+            commandId: CommandId.make(id),
+            threadId: sideChatId,
+            messageId: MessageId.make(`message:${id}`),
+            text,
+            attachments: [],
+            modelSelection: runSelection,
+            dispatchMode: { type: "start_immediately" },
+            createdBy: "user",
+            creationSource: "web",
+          });
+        const sideChatEvent = (matches: (event: OrchestrationV2DomainEvent) => boolean) =>
+          orchestrator.streamDomainEvents.pipe(
+            Stream.filter((event) => event.threadId === sideChatId && matches(event)),
+            Stream.take(1),
+            Stream.runDrain,
+            Effect.forkScoped({ startImmediately: true }),
+          );
+        const askAndFinish = (id: string, text: string) =>
+          Effect.gen(function* () {
+            const earlierTurnIds = new Set(
+              (yield* orchestrator.getThreadProjection(sideChatId)).providerTurns.map(
+                (turn) => turn.id,
+              ),
+            );
+            const running = yield* sideChatEvent(
+              (event) =>
+                event.type === "provider-turn.updated" &&
+                event.payload.status === "running" &&
+                !earlierTurnIds.has(event.payload.id),
+            );
+            // The provider finished; checkpoint capture completes the run on the next drain.
+            const settled = yield* sideChatEvent(
+              (event) => event.type === "run.updated" && event.payload.status === "waiting",
+            );
+            yield* ask(id, text);
+            yield* worker.drain();
+            yield* Fiber.join(running);
+            assert.include(yield* refusal(`${id}-while-running`), "work in progress");
+            const turn = (yield* orchestrator.getThreadProjection(sideChatId)).providerTurns.find(
+              (candidate) => !earlierTurnIds.has(candidate.id),
+            )!;
+            yield* Queue.offer(events, {
+              type: "provider_turn.updated",
+              driver,
+              providerTurn: { ...turn, status: "completed", completedAt: yield* DateTime.now },
+            });
+            yield* Queue.offer(events, {
+              type: "turn.terminal",
+              driver,
+              providerThreadId: turn.providerThreadId,
+              providerTurnId: turn.id,
+              runOrdinal: started.at(-1)!.runOrdinal,
+              status: "completed",
+              failure: null,
+              threadDisposition: "reusable",
+            });
+            yield* Fiber.join(settled);
+            yield* worker.drain();
+          });
+
+        assert.include(yield* refusal("before-any-message"), "has not had a reply yet");
+        assert.include(yield* refusal("parent", parentId), "is not a side chat");
+        // A /goal turn defers the parent's context to the next prompt.
+        yield* askAndFinish("goal", "/goal clear");
+        assert.include(yield* refusal("after-goal"), "has not had a reply yet");
+        yield* askAndFinish("question", "What is the main thread doing?");
+        yield* promote("promote");
+
+        const promoted = yield* orchestrator.getThreadShell(sideChatId);
+        assert.deepEqual(promoted?.lineage, {
+          parentThreadId: parentId,
+          relationshipToParent: "fork",
+          rootThreadId: parentId,
+        });
+        assert.include(yield* refusal("again"), "is not a side chat");
+        yield* orchestrator.dispatch({
+          type: "thread.delete",
+          commandId: CommandId.make("side-chat-promote-delete-parent"),
+          threadId: parentId,
+        });
+        assert.isNull((yield* orchestrator.getThreadProjection(sideChatId)).thread.deletedAt);
+      }).pipe(Effect.provide(layer));
+    }),
+  ),
+);

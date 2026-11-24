@@ -11,6 +11,7 @@ import {
   type ScopedThreadRef,
   type ThreadId,
 } from "@t3tools/contracts";
+import { useNavigate } from "@tanstack/react-router";
 import { Trash2Icon, XIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -22,17 +23,19 @@ import type { SideChatParentPanel } from "../../lib/sideChatPane";
 import { readLocalApi } from "../../localApi";
 import { hostRightPanel, useRightPanelStore } from "../../rightPanelStore";
 import { useQuietThreadProjection, useQuietThreadShell } from "../../state/entities";
+import { useEnvironment } from "../../state/environments";
 import { useEnvironmentScope } from "../../state/session";
 import { useEnvironmentShellHasSnapshot } from "../../state/shell";
 import { threadEnvironment } from "../../state/threads";
 import { useAtomCommand } from "../../state/use-atom-command";
+import { buildThreadRouteParams } from "../../threadRoutes";
 import ChatView from "../ChatView";
 import { Button } from "../ui/button";
 import { toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { BackgroundThreadContext } from "./backgroundThread";
 
-/** A side chat tab: its title, Bring back, Delete and Close, over the side chat's own chat. */
+/** A side chat tab: its title, Bring back, Make main thread, Delete and Close, over its chat. */
 export default function SideChatPane(props: {
   readonly parentRef: ScopedThreadRef;
   readonly threadId: ThreadId;
@@ -53,9 +56,17 @@ export default function SideChatPane(props: {
   const canOperate = useEnvironmentScope(parentRef.environmentId, AuthOrchestrationOperateScope);
   const mergeBack = useAtomCommand(threadEnvironment.mergeBack, { reportFailure: false });
   const deleteThread = useAtomCommand(threadEnvironment.delete, { reportFailure: false });
+  const promoteSideChat = useAtomCommand(threadEnvironment.promoteSideChat, {
+    reportFailure: false,
+  });
+  const navigate = useNavigate();
+  const promotionSupported =
+    useEnvironment(parentRef.environmentId)?.serverConfig?.environment.capabilities
+      .sideChatPromotion === true;
   const confirmThreadDelete = useClientSettings((settings) => settings.confirmThreadDelete);
   const [bringingBack, setBringingBack] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [promoting, setPromoting] = useState(false);
   const mergeRun = projection ? resolveLatestMergeBackRun(projection) : null;
   // A pending merge-back would fail the main thread's queued message, so the server refuses it.
   const bringBackBlockedReason = !canOperate
@@ -85,6 +96,43 @@ export default function SideChatPane(props: {
       toastManager.add({
         type: "error",
         title: "Could not bring back the side chat",
+        ...(error instanceof Error ? { description: error.message } : {}),
+      });
+    }
+  };
+
+  // The server also waits for the parent's context to reach the agent, which a /goal turn defers.
+  const promoteBlockedReason = !canOperate
+    ? "This connection cannot change threads."
+    : !promotionSupported
+      ? "Update this environment's T3 Code server to use this."
+      : threadRuntimeIsActive(shell?.runtime)
+        ? "Available when the side chat is idle."
+        : mergeRun === null
+          ? "Available after a finished reply."
+          : null;
+
+  // Another client may have promoted it while this tab stayed open.
+  const promoted = shell !== null && shell.lineage.sideChat !== true;
+  const openThread = () =>
+    void navigate({ to: "/$environmentId/$threadId", params: buildThreadRouteParams(threadRef) });
+
+  const promote = async () => {
+    if (promoteBlockedReason !== null || promoting) return;
+    setPromoting(true);
+    const result = await promoteSideChat({
+      environmentId: parentRef.environmentId,
+      input: { threadId },
+    });
+    setPromoting(false);
+    if (result._tag === "Success") {
+      useRightPanelStore.getState().closeSurface(parentRef, `side-chat:${threadId}`);
+      openThread();
+    } else if (!isAtomCommandInterrupted(result)) {
+      const error = squashAtomCommandFailure(result);
+      toastManager.add({
+        type: "error",
+        title: "Could not make the side chat a main thread",
         ...(error instanceof Error ? { description: error.message } : {}),
       });
     }
@@ -132,32 +180,54 @@ export default function SideChatPane(props: {
         <span className="min-w-0 flex-1 truncate text-xs font-medium">
           {shell?.title ?? "Side chat"}
         </span>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant="ghost"
-                size="xs"
-                aria-disabled={bringBackBlockedReason !== null || bringingBack || undefined}
-                onClick={() => void bringBack()}
-              >
-                Bring back
-              </Button>
-            }
-          />
-          <TooltipPopup side="bottom">
-            {bringBackBlockedReason ?? "Adds this side chat to the main thread's next message."}
-          </TooltipPopup>
-        </Tooltip>
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          aria-label="Delete side chat"
-          disabled={!canOperate || shell === null || deleting}
-          onClick={() => void deleteSideChat()}
-        >
-          <Trash2Icon />
-        </Button>
+        {promoted ? null : (
+          <>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    aria-disabled={bringBackBlockedReason !== null || bringingBack || undefined}
+                    onClick={() => void bringBack()}
+                  >
+                    Bring back
+                  </Button>
+                }
+              />
+              <TooltipPopup side="bottom">
+                {bringBackBlockedReason ?? "Adds this side chat to the main thread's next message."}
+              </TooltipPopup>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    aria-disabled={promoteBlockedReason !== null || promoting || undefined}
+                    onClick={() => void promote()}
+                  >
+                    Make main thread
+                  </Button>
+                }
+              />
+              <TooltipPopup side="bottom">
+                {promoteBlockedReason ??
+                  "Moves this side chat to the sidebar as its own thread. Deleting the main thread keeps it."}
+              </TooltipPopup>
+            </Tooltip>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              aria-label="Delete side chat"
+              disabled={!canOperate || shell === null || deleting}
+              onClick={() => void deleteSideChat()}
+            >
+              <Trash2Icon />
+            </Button>
+          </>
+        )}
         <Button variant="ghost" size="icon-xs" aria-label="Close side chat" onClick={props.onClose}>
           <XIcon />
         </Button>
@@ -166,6 +236,13 @@ export default function SideChatPane(props: {
         snapshotLoaded ? (
           <p className="p-3 text-xs text-muted-foreground">This side chat was deleted.</p>
         ) : null
+      ) : promoted ? (
+        <div className="flex flex-col items-start gap-2 p-3">
+          <p className="text-xs text-muted-foreground">This side chat is now a main thread.</p>
+          <Button variant="outline" size="xs" onClick={openThread}>
+            Open thread
+          </Button>
+        </div>
       ) : (
         <BackgroundThreadContext value>
           <ComposerHandleContext value={null}>

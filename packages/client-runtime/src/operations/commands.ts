@@ -1012,6 +1012,17 @@ export const forkSideChat = Effect.fn("EnvironmentCommands.forkSideChat")(functi
   });
 });
 
+/** Turns a side chat into a listed thread; the server refuses it before the first reply. */
+export const promoteSideChat = Effect.fn("EnvironmentCommands.promoteSideChat")(function* (
+  input: ThreadCommandInput,
+) {
+  return yield* dispatch({
+    type: "thread.side-chat.promote",
+    commandId: yield* allocateCommandId(input),
+    threadId: input.threadId,
+  });
+});
+
 export const mergeThreadBack = Effect.fn("EnvironmentCommands.mergeThreadBack")(function* (
   input: MergeThreadBackInput,
 ) {

@@ -313,6 +313,11 @@ parent do not change existing side chats.
 To use what you learned, choose **Bring back**. The thread gets the side chat with
 your next message there. Bring back is available while the thread is idle.
 
+To keep working on a side chat as a thread of its own, choose **Make main thread**. It
+moves to the sidebar with its conversation, shown as a fork of the thread, and
+deleting the thread no longer deletes it. It is available once the side chat has a
+finished reply and nothing is running in it.
+
 Closing a side chat you never sent a message in deletes it. To delete one you used,
 choose **Delete** at the top of the side chat. Deleting a thread also deletes its
 side chats.
